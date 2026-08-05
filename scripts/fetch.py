@@ -5,21 +5,20 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BOARDS_PATH = ROOT / "boards.json"
-DATA_DIR = ROOT / "data" / "people"
-
-
-def run_gh_json(args: list[str]) -> dict | list:
-    r = subprocess.run(["gh", *args], capture_output=True, text=True)
-    if r.returncode != 0:
-        raise RuntimeError(r.stderr.strip() or r.stdout.strip() or "gh failed")
-    return json.loads(r.stdout)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config import (  # noqa: E402
+    BOARDS_PATH,
+    DATA_DIR,
+    data_path_for,
+    load_config,
+    resolve_person,
+    run_gh_json,
+)
 
 
 def graphql(query: str, variables: dict | None = None) -> dict:
@@ -352,46 +351,49 @@ def fetch_person(login: str, name: str, cfg: dict) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Fetch cycle-time board data")
+    parser = argparse.ArgumentParser(
+        description="Fetch cycle-time board data for the authenticated GitHub user"
+    )
     parser.add_argument(
         "--person",
-        action="append",
-        help="GitHub login to fetch (repeatable). Default: all people in boards.json",
+        help="Override GitHub login (default: identity from gh auth / GH_TOKEN)",
     )
     parser.add_argument(
         "--boards",
         type=Path,
         default=BOARDS_PATH,
-        help="Path to boards.json",
+        help="Optional boards.json overlay (project/repos). Not required.",
+    )
+    parser.add_argument(
+        "--no-auth",
+        action="store_true",
+        help="Do not call GitHub for identity; use boards.json person only",
     )
     args = parser.parse_args()
 
-    cfg = json.loads(args.boards.read_text())
-    if "person" in cfg:
-        people = [cfg["person"]]
-    else:
-        people = cfg.get("people") or []
-    if args.person:
-        wanted = set(args.person)
-        # Allow fetching logins even if only one person is configured
-        people = [{"login": login, "name": login} for login in wanted]
-
-    if not people:
-        print("No person configured in boards.json", file=sys.stderr)
+    cfg = load_config(args.boards if args.boards.exists() else None)
+    try:
+        person = resolve_person(
+            cfg,
+            login_override=args.person,
+            use_auth=not args.no_auth,
+        )
+    except RuntimeError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
         return 1
 
+    login = person["login"]
+    print(f"Authenticated board user: {login}", flush=True)
+    print(f"Fetching {login}…", flush=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    for person in people:
-        login = person["login"]
-        print(f"Fetching {login}…", flush=True)
-        try:
-            data = fetch_person(login, person.get("name") or login, cfg)
-        except Exception as e:
-            print(f"  ERROR: {e}", file=sys.stderr)
-            return 1
-        out = DATA_DIR / f"{login}.json"
-        out.write_text(json.dumps(data, indent=2) + "\n")
-        print(f"  wrote {out} ({len(data['issues'])} issues)")
+    try:
+        data = fetch_person(login, person.get("name") or login, cfg)
+    except Exception as e:
+        print(f"  ERROR: {e}", file=sys.stderr)
+        return 1
+    out = data_path_for(login)
+    out.write_text(json.dumps(data, indent=2) + "\n")
+    print(f"  wrote {out} ({len(data['issues'])} issues)")
     return 0
 
 

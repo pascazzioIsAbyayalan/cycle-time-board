@@ -9,45 +9,32 @@ description: >-
 
 # Cycle Time Board
 
-Personal GitHub Project cycle-time board. Outputs:
+Personal GitHub Project cycle-time board. Identity comes from **`gh` auth or `GH_TOKEN`** — users do not need to edit JSON for the default board.
 
-1. **HTML** — `dist/index.html` (browser; light/dark; interactive label pie; collapsible cycle sections)
-2. **Cursor canvas** — `dist/cycle-time-board.canvas.tsx` (copy into a workspace `canvases/` folder)
+**GitHub MCP is not required.** Use the shell + `gh` CLI.
 
-Full end-user install: see [README.md](README.md).
+Outputs:
 
-## Package location
+1. **HTML** — `dist/index.html`
+2. **Cursor canvas** — `dist/cycle-time-board.canvas.tsx`
 
-Prefer the cloned repo root as cwd (or `~/.cursor/skills/cycle-time-board-pkg` if symlinked).
+Full install: [README.md](README.md).
 
 ## Workflow
 
 ```
 Progress:
-- [ ] 1. gh auth status (login if needed)
-- [ ] 2. Confirm boards.json person.login
-- [ ] 3. python3 scripts/fetch.py
-- [ ] 4. python3 scripts/generate_html.py
-- [ ] 5. python3 scripts/generate_canvas.py
-- [ ] 6. Copy canvas into workspace canvases/ if using Cursor
+- [ ] 1. gh auth status (or GH_TOKEN set)
+- [ ] 2. python3 scripts/fetch.py
+- [ ] 3. python3 scripts/generate_html.py
+- [ ] 4. python3 scripts/generate_canvas.py
+- [ ] 5. Copy canvas into workspace canvases/ if needed
 ```
 
 ```bash
 python3 scripts/fetch.py
 python3 scripts/generate_html.py
 python3 scripts/generate_canvas.py
-open dist/index.html
-cp dist/cycle-time-board.canvas.tsx ~/.cursor/projects/<workspace>/canvases/
 ```
 
-## Defaults
-
-Configured in `boards.json` (see `boards.example.json`):
-
-- Project: Kuadrant org **#18**, area **UI Touch Grass**
-- Repo: `Kuadrant/kuadrant-console-plugin`
-- Person: `person.login` / `person.name`
-
-## Enriching PR summaries
-
-`fetch.py` may store a light PR blurb. Enrich `prSummary` in `data/people/<login>.json` (problem / solution / keyChanges) before regenerating when storytelling needs more detail.
+Optional project overlay: `boards.json` (see `boards.example.json`). Do not require `person` in config.

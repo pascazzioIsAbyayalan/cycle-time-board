@@ -2,18 +2,18 @@
 
 A personal **GitHub Project cycle-time board** you can open in the browser or in Cursor.
 
-It shows your assigned issues from a GitHub Project (default: Kuadrant Project #18 · UI Touch Grass area) with:
+It shows **your** assigned issues (identity comes from your GitHub login/token) for a Project — default: Kuadrant Project #18 · UI Touch Grass — with:
 
-- Summary stats and label breakdown (interactive donut chart)
+- Summary stats and an interactive label donut chart
 - Search / date / label / sprint filters
-- **Cycle time** view (open issues first, collapsible sections, timeline bars, PR summaries)
+- **Cycle time** view (collapsible Open / Completed sections, timelines, PR summaries)
 - **Board** and **Sprint table** views
 - Light / dark mode
 
 | Format | What you get |
 | ------ | ------------ |
 | **Browser HTML** | `dist/index.html` — static snapshot, no server |
-| **Cursor canvas + skill** | Live-looking board beside chat + agent refresh workflow |
+| **Cursor canvas + skill** | Board beside chat + agent refresh workflow |
 
 ---
 
@@ -22,70 +22,76 @@ It shows your assigned issues from a GitHub Project (default: Kuadrant Project #
 | Requirement | Why |
 | ----------- | --- |
 | [Python 3](https://www.python.org/) | Runs fetch + generate scripts |
-| [GitHub CLI](https://cli.github.com/) (`gh`) | Authenticates and queries GitHub |
-| Access to the target org/project/repos | Scripts read Project fields and assigned issues |
-| [Cursor](https://cursor.com/) *(optional)* | For the skill + canvas install |
+| [GitHub CLI](https://cli.github.com/) (`gh`) **or** a GitHub token in `GH_TOKEN` | Authenticates API calls |
+| Access to the target org/project/repos | Scripts read Project fields and your assigned issues |
+| [Cursor](https://cursor.com/) *(optional)* | Skill + canvas only |
 
-No Node/npm install. The HTML board does **not** call GitHub from the browser — you regenerate it locally after fetching.
+**You do not need the GitHub MCP** in Cursor for this package. Scripts talk to GitHub through `gh` (which uses your login or `GH_TOKEN`). Cursor’s GitHub MCP is unrelated and optional.
+
+No Node/npm install. The HTML board does **not** call GitHub from the browser.
 
 ---
 
-## Connect your GitHub
+## Connect your GitHub (no JSON editing)
 
-Authentication is via the GitHub CLI (not a token pasted into the HTML):
+Your board user is detected automatically from auth. You do **not** need to put your username in a config file.
+
+### Option A — GitHub CLI (recommended)
 
 ```bash
-# Install gh if needed: https://cli.github.com/
 gh auth login
+gh auth status
 ```
 
-Follow the prompts (HTTPS or SSH, authenticate in the browser). Then verify:
+Use a browser login or paste a token when `gh` asks. For org projects you may need SSO authorization on the token.
+
+### Option B — Token environment variable
+
+Create a [personal access token](https://github.com/settings/tokens) (classic) with at least:
+
+- `repo` (or fine-grained read access to the repos)
+- `read:project`
+- `read:org` if the Project lives in a private/SSO org
+
+Then:
 
 ```bash
-gh auth status
-gh api user --jq .login
+export GH_TOKEN=ghp_xxxxxxxxxxxxxxxx
+# GITHUB_TOKEN is also accepted
 ```
 
-That login should match `person.login` in `boards.json` (or change `boards.json` to match).
-
-If Project queries fail, check:
-
-- You can open the project URL in the browser while logged in
-- Org **SSO** is authorized for the `gh` token (`gh auth refresh -s read:project` if needed)
-- You have at least read access to the repository and Project
+`gh` and these scripts will use that token. No `boards.json` edit required for the default Kuadrant board.
 
 ---
 
-## Quick start (browser board)
+## Quick start
 
 ```bash
 git clone https://github.com/pascazzioIsAbyayalan/cycle-time-board.git
 cd cycle-time-board
 
-# 1. Point the board at yourself
-cp boards.example.json boards.json
-# Edit boards.json → person.login / person.name
+# 1. Authenticate (once)
+gh auth login
+# or: export GH_TOKEN=ghp_...
 
-# 2. Pull your issues from GitHub
+# 2. Pull YOUR issues + build outputs
 python3 scripts/fetch.py
-
-# 3. Build the HTML (and Cursor canvas)
 python3 scripts/generate_html.py
 python3 scripts/generate_canvas.py
 
-# 4. Open in your browser
+# 3. Open the board
 open dist/index.html        # macOS
 # xdg-open dist/index.html  # Linux
-# start dist/index.html     # Windows
 ```
 
-Refresh later by re-running steps 2–4.
+Refresh anytime by re-running step 2.
 
 ---
 
-## Configure
+## Optional configuration
 
-Edit `boards.json` (start from `boards.example.json`):
+Built-in defaults target Kuadrant Project #18 / `kuadrant-console-plugin`.  
+Only create/edit `boards.json` if you need a **different project or repo** (copy from `boards.example.json`).
 
 ```json
 {
@@ -96,53 +102,37 @@ Edit `boards.json` (start from `boards.example.json`):
     "url": "https://github.com/orgs/Kuadrant/projects/18",
     "area": "UI Touch Grass"
   },
-  "repos": ["Kuadrant/kuadrant-console-plugin"],
-  "person": {
-    "login": "YOUR_GITHUB_USERNAME",
-    "name": "Your Name"
-  }
+  "repos": ["Kuadrant/kuadrant-console-plugin"]
 }
 ```
 
-| Field | Meaning |
-| ----- | ------- |
-| `project.owner` / `number` | GitHub org (or user) Project |
-| `project.area` | Optional Project “Area” filter (omit or `null` to skip) |
-| `repos` | Repositories to search for issues assigned to you |
-| `person.login` | Your GitHub username |
+`person` is optional. If present it is only used as a fallback when auth is unavailable, or with `--no-auth`.
 
-This package is **personal only** (one assignee board). Share the generated HTML if others should view a snapshot of your board.
+```bash
+# Fetch someone else’s assigned issues (override)
+python3 scripts/fetch.py --person other-login
+```
 
 ---
 
 ## Install in Cursor (optional)
 
-### 1. Personal skill
-
-From the repo root:
+GitHub MCP is **not** required.
 
 ```bash
+# Personal skill
 mkdir -p ~/.cursor/skills/cycle-time-board
 cp SKILL.md ~/.cursor/skills/cycle-time-board/SKILL.md
 ln -sfn "$(pwd)" ~/.cursor/skills/cycle-time-board-pkg
-```
 
-The symlink lets the agent find `scripts/` and `boards.json` when you ask it to refresh.
-
-### 2. Canvas in a workspace
-
-```bash
+# Canvas into a workspace
 python3 scripts/generate_canvas.py
 mkdir -p ~/.cursor/projects/<your-workspace>/canvases
 cp dist/cycle-time-board.canvas.tsx \
   ~/.cursor/projects/<your-workspace>/canvases/cycle-time-board.canvas.tsx
 ```
 
-Open the `.canvas.tsx` file beside chat in Cursor.
-
-### 3. Refresh via the agent
-
-In Cursor chat:
+In Cursor chat (with `gh` already authenticated in that environment):
 
 > Using the cycle-time-board skill, refresh the board from GitHub and regenerate the HTML + canvas.
 
@@ -152,43 +142,16 @@ In Cursor chat:
 
 | Command | Purpose |
 | ------- | ------- |
-| `python3 scripts/fetch.py` | Fetch assigned issues + Project status/sprint/PRs into `data/people/<login>.json` |
+| `python3 scripts/fetch.py` | Resolve you via `gh`/`GH_TOKEN`, fetch issues → `data/people/<login>.json` |
 | `python3 scripts/generate_html.py` | Build `dist/index.html` |
 | `python3 scripts/generate_canvas.py` | Build `dist/cycle-time-board.canvas.tsx` |
 
-```bash
-# Fetch only (uses boards.json person)
-python3 scripts/fetch.py
-
-# Fetch a specific login (writes data/people/<login>.json)
-python3 scripts/fetch.py --person someuser
-```
-
 ---
 
-## Repository layout
+## Sharing
 
-```
-boards.json                 # Your config (gitignored patterns optional; example provided)
-boards.example.json         # Template for new users
-data/people/<login>.json    # Fetched snapshots
-scripts/fetch.py
-scripts/generate_html.py
-scripts/generate_canvas.py
-templates/board.html
-templates/canvas.tsx.template
-dist/index.html             # Browser board
-dist/cycle-time-board.canvas.tsx
-SKILL.md                    # Cursor agent skill
-```
-
----
-
-## Sharing with others
-
-- **Snapshot:** send or host `dist/index.html` (self-contained; no GitHub auth in the browser).
-- **Reusable tool:** share this repo; each person runs `gh auth login`, edits `boards.json`, then fetch + generate.
-- **Cursor teammates:** they clone the repo and follow **Install in Cursor** above.
+- **Snapshot:** share `dist/index.html` (self-contained; viewers need no GitHub auth).
+- **Tool:** share this repo; each person authenticates as themselves and runs fetch + generate.
 
 ---
 
@@ -196,10 +159,10 @@ SKILL.md                    # Cursor agent skill
 
 | Problem | What to try |
 | ------- | ----------- |
-| `gh` / GraphQL errors | `gh auth status`, re-run `gh auth login`, authorize SSO for the org |
-| Empty board | Confirm `person.login`, that issues are assigned to you, and `repos` / `project.area` match reality |
-| Project field missing | Status/Area/Sprint names must exist on that Project; Area filter skips mismatched items when set |
-| Canvas not appearing | File must live under `~/.cursor/projects/<workspace>/canvases/` and end in `.canvas.tsx` |
+| Auth errors | `gh auth login` or set `GH_TOKEN`; for orgs authorize SSO on the token |
+| Empty board | Issues must be **assigned to your user**; check Project Area filter in defaults |
+| Wrong user | `gh api user --jq .login` — that login is whose board is fetched |
+| Cursor refresh fails | Ensure the integrated terminal can run `gh auth status` (MCP not used) |
 
 ---
 

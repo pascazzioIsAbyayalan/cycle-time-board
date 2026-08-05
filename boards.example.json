@@ -6,9 +6,5 @@
     "url": "https://github.com/orgs/Kuadrant/projects/18",
     "area": "UI Touch Grass"
   },
-  "repos": ["Kuadrant/kuadrant-console-plugin"],
-  "person": {
-    "login": "YOUR_GITHUB_USERNAME",
-    "name": "Your Name"
-  }
+  "repos": ["Kuadrant/kuadrant-console-plugin"]
 }
