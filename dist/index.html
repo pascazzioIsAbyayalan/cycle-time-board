@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UI Touch Grass — Cycle Time</title>
+  <style>
+    :root, [data-theme="light"] {
+      --blush: #fff0f8;
+      --lavender: #ebe0fc;
+      --mint: #d4f5ee;
+      --grey: #707070;
+      --charcoal: #333333;
+      --lavender-deep: #c4a8f5;
+      --mint-deep: #52c5ad;
+      --blush-border: #e8c8e0;
+      --bg: #f7f5f8;
+      --surface: #ffffff;
+      --amber: #f59e0b;
+      --amber-text: #b45309;
+      --amber-soft: #f59e0b22;
+      --closed-bg: #e0e0e0;
+      --closed-text: #666;
+    }
+    [data-theme="dark"] {
+      --blush: #2a2230;
+      --lavender: #3a2f52;
+      --mint: #1e3d38;
+      --grey: #a0a4ab;
+      --charcoal: #ececec;
+      --lavender-deep: #9b7fd4;
+      --mint-deep: #52c5ad;
+      --blush-border: #3d3548;
+      --bg: #1a1b1e;
+      --surface: #24262b;
+      --amber: #f59e0b;
+      --amber-text: #fbbf24;
+      --amber-soft: rgba(245, 158, 11, 0.16);
+      --closed-bg: #444;
+      --closed-text: #bbb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--charcoal);
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 24px; }
+    .header {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      background: var(--lavender); border-radius: 10px; padding: 16px 20px;
+      margin-bottom: 12px;
+    }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    .header .sub { margin: 4px 0 0; font-size: 13px; color: var(--grey); }
+    .header .sub a { color: var(--grey); }
+    .header-actions { margin-left: auto; display: flex; gap: 8px; }
+    button, select, input[type="text"], input[type="search"] {
+      font: inherit; color: var(--charcoal);
+      background: var(--surface);
+      border: 1.5px solid var(--blush-border);
+      border-radius: 7px;
+      padding: 7px 12px;
+      outline: none;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--lavender-deep); }
+    .btn-primary { background: var(--surface); }
+    .stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      margin: 20px 0;
+    }
+    @media (max-width: 720px) { .stats { grid-template-columns: 1fr 1fr; } }
+    .stat {
+      background: var(--surface); border: 1px solid var(--blush-border);
+      border-radius: 10px; padding: 14px 16px;
+    }
+    .stat .v { font-size: 22px; font-weight: 700; }
+    .stat .l { font-size: 12px; color: var(--grey); margin-top: 2px; }
+    hr { border: none; border-top: 1px solid var(--blush-border); margin: 20px 0; }
+    h2 { font-size: 18px; margin: 0 0 4px; }
+    h3 { font-size: 15px; margin: 0 0 8px; }
+    .hint { font-size: 13px; color: var(--grey); margin: 0 0 14px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+    .pie-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .pie-svg { width: 220px; height: 220px; overflow: visible; }
+    .pie-slice { cursor: pointer; transition: opacity 0.15s, transform 0.15s; transform-origin: 110px 110px; }
+    .pie-slice.dim { opacity: 0.35; }
+    .pie-slice.hot { transform: scale(1.04); }
+    .pie-center-text { font-size: 22px; font-weight: 700; fill: var(--charcoal); text-anchor: middle; }
+    .pie-center-sub { font-size: 11px; fill: var(--grey); text-anchor: middle; }
+    .pie-tooltip {
+      min-height: 36px; font-size: 12px; color: var(--grey); text-align: center;
+      padding: 6px 10px; border-radius: 8px; border: 1px solid transparent;
+    }
+    .pie-tooltip.active {
+      color: var(--charcoal); background: var(--surface);
+      border-color: var(--blush-border);
+    }
+    .pie-legend {
+      display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: center;
+      font-size: 12px; color: var(--charcoal);
+    }
+    .pie-legend button {
+      all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 4px; border-radius: 4px;
+    }
+    .pie-legend button:hover, .pie-legend button.hot { background: color-mix(in srgb, var(--lavender) 50%, transparent); }
+    .pie-legend button.dim { opacity: 0.4; }
+    .pie-legend .sw { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .section-toggle {
+      all: unset; cursor: pointer; display: flex; align-items: flex-start; gap: 8px;
+      width: 100%; margin: 20px 0 8px;
+    }
+    .section-toggle .arrow {
+      font-size: 11px; margin-top: 6px; display: inline-block;
+      transition: transform 0.15s;
+    }
+    .section-toggle .arrow.open { transform: rotate(90deg); }
+    .section-toggle h2 { margin: 0; }
+    .section-body { display: none; }
+    .section-body.open { display: block; }
+    .label-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .label-table th, .label-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--blush-border); }
+    .label-table th { font-size: 11px; color: var(--grey); text-transform: uppercase; }
+    .label-table td:last-child, .label-table th:last-child { text-align: right; font-weight: 600; }
+    .filters { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+    .search-wrap { position: relative; }
+    .search-wrap .icon {
+      position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+      font-size: 14px; color: var(--grey); pointer-events: none;
+    }
+    .search-wrap input { width: 100%; padding-left: 32px; }
+    .filter-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media (max-width: 700px) { .filter-row { grid-template-columns: 1fr; } }
+    .filter-row label { display: flex; flex-direction: column; gap: 3px; }
+    .filter-row .lbl {
+      font-size: 10px; font-weight: 600; color: var(--grey);
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    select {
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23707070'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+      padding-right: 28px; cursor: pointer; width: 100%;
+    }
+    .chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 11px; color: var(--grey); }
+    .chip-x {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 20px; font-size: 11px; color: var(--charcoal);
+    }
+    .chip-x button { all: unset; cursor: pointer; font-size: 10px; color: var(--grey); }
+    .pills { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+    .pill {
+      border-radius: 999px; padding: 6px 12px; font-size: 13px;
+      border: 1.5px solid var(--blush-border); background: var(--surface); color: var(--grey);
+    }
+    .pill.active {
+      background: var(--lavender); color: var(--charcoal);
+      border-color: var(--lavender-deep); font-weight: 600;
+    }
+    .card {
+      border: 1px solid var(--blush-border); border-radius: 10px;
+      padding: 14px 16px; margin-bottom: 12px; border-left-width: 3px;
+    }
+    .card.ip { border-left-color: var(--amber); background: var(--amber-soft); }
+    .card.todo { border-left-color: var(--lavender-deep); background: color-mix(in srgb, var(--lavender) 55%, transparent); }
+    .card.done { border-left-color: var(--mint-deep); background: color-mix(in srgb, var(--mint-deep) 14%, transparent); }
+    .card.closed { border-left-color: var(--grey); background: color-mix(in srgb, var(--grey) 12%, transparent); opacity: 0.95; }
+    .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .card-head .num { font-family: ui-monospace, monospace; font-size: 12px; color: var(--grey); font-weight: 600; }
+    .spacer { flex: 1; }
+    .badge {
+      font-size: 10px; padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+    }
+    .badge.todo { background: var(--lavender); color: var(--charcoal); }
+    .badge.ip { background: var(--amber-soft); color: var(--amber-text); font-weight: 600; }
+    .badge.review { background: var(--mint); color: #0e7c65; }
+    .badge.done { background: var(--mint-deep); color: #fff; }
+    .badge.closed { background: var(--closed-bg); color: var(--closed-text); }
+    .title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+    .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 12px; }
+    .meta.two { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 600px) { .meta { grid-template-columns: 1fr 1fr; } }
+    .meta .k { font-size: 10px; color: var(--grey); letter-spacing: 0.05em; text-transform: uppercase; }
+    .meta .sub { font-size: 10px; color: var(--grey); }
+    .labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+    .chip {
+      font-size: 10px; padding: 1px 5px; border-radius: 3px;
+      background: color-mix(in srgb, var(--lavender) 70%, var(--surface));
+      color: var(--grey); white-space: nowrap;
+    }
+    .chip.hot { color: var(--grey); background: color-mix(in srgb, var(--lavender) 40%, var(--surface)); }
+    .bar-wrap { position: relative; margin: 8px 0 6px; }
+    .bar {
+      height: 10px; border-radius: 5px; display: flex; overflow: visible;
+      background: color-mix(in srgb, var(--blush-border) 50%, var(--surface));
+    }
+    .bar .seg-todo { background: var(--lavender); border-radius: 5px 0 0 5px; }
+    .bar .seg-ip { background: var(--amber); }
+    .bar .seg-review { background: var(--mint-deep); border-radius: 0 5px 5px 0; }
+    .bar-marker {
+      position: absolute; top: -3px; bottom: -3px; width: 2px;
+      background: var(--amber); border-radius: 1px;
+    }
+    .bar-phase {
+      position: relative; height: 36px; font-size: 9px; color: var(--grey); margin-bottom: 4px;
+    }
+    .bar-phase .left { position: absolute; left: 0; display: flex; flex-direction: column; }
+    .bar-phase .mid { position: absolute; display: flex; flex-direction: column; }
+    .bar-phase .right { position: absolute; right: 0; display: flex; flex-direction: column; align-items: flex-end; }
+    .bar-phase strong { font-weight: 600; color: var(--charcoal); }
+    .bar-phase .ip-lab { font-weight: 600; color: var(--amber); }
+    .bar-phase .merged { font-weight: 500; color: var(--mint-deep); }
+    .legend { display: flex; gap: 10px; margin-top: 4px; }
+    .legend span { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; color: var(--grey); }
+    .swatch { width: 8px; height: 8px; border-radius: 2px; }
+    .summary-toggle {
+      margin-top: 10px; width: 100%; text-align: left; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 6px;
+      background: var(--blush); border: 1px solid var(--blush-border);
+      font-size: 11px; color: var(--charcoal); font-weight: 500;
+    }
+    .summary-toggle.open { border-radius: 6px 6px 0 0; background: var(--lavender); }
+    .summary-body {
+      padding: 12px 14px; border: 1px solid var(--blush-border); border-top: none;
+      border-radius: 0 0 6px 6px; background: var(--blush); font-size: 12px;
+    }
+    .summary-body .tag {
+      font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 500;
+      background: var(--lavender); color: var(--charcoal); display: inline-block; margin-bottom: 8px;
+    }
+    .summary-body .tag.closed { background: var(--closed-bg); color: var(--closed-text); }
+    .summary-body .sec { margin-top: 10px; }
+    .summary-body .sec .k {
+      font-size: 10px; font-weight: 600; color: var(--grey);
+      letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px;
+    }
+    .summary-body li { margin: 4px 0; }
+    .board {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start;
+    }
+    @media (max-width: 900px) { .board { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 520px) { .board { grid-template-columns: 1fr; } }
+    .col h3 { font-size: 13px; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+    .count {
+      font-size: 10px; width: 18px; height: 18px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--blush-border) 60%, var(--surface)); color: var(--grey);
+    }
+    .col-line { height: 2px; border-radius: 1px; margin-bottom: 8px; background: var(--lavender-deep); }
+    .col-line.ip { background: var(--amber); }
+    .col-line.done { background: var(--mint-deep); }
+    .col-line.closed { background: var(--grey); }
+    .mini-card {
+      border-radius: 5px; padding: 10px 12px; margin-bottom: 8px;
+      border: 1px solid var(--blush-border);
+      background: color-mix(in srgb, var(--lavender) 35%, var(--surface));
+    }
+    .mini-card.done { background: color-mix(in srgb, var(--mint) 55%, transparent); opacity: 0.85; }
+    .mini-card.closed { background: #f0f0f0; opacity: 0.85; }
+    [data-theme="dark"] .mini-card.closed { background: #2c2e34; }
+    .mini-card.ip { background: #f59e0b11; }
+    .mini-card .title { font-size: 12px; }
+    .mini-card .title.strike { text-decoration: line-through; color: var(--grey); }
+    table.sprint { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); border-radius: 10px; overflow: hidden; }
+    table.sprint th, table.sprint td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--blush-border); vertical-align: top; }
+    table.sprint th { font-size: 11px; color: var(--grey); text-transform: uppercase; letter-spacing: 0.04em; position: sticky; top: 0; background: var(--surface); }
+    table.sprint tr:nth-child(even) td { background: color-mix(in srgb, var(--blush) 40%, transparent); }
+    .empty {
+      text-align: center; padding: 48px 24px; border-radius: 10px;
+      border: 1.5px dashed var(--blush-border); background: var(--blush);
+    }
+    a { color: inherit; }
+    a:hover { text-decoration: underline; }
+    .footer { margin-top: 28px; font-size: 12px; color: var(--grey); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div>
+        <h1 id="title">UI Touch Grass — Cycle Time</h1>
+        <p class="sub" id="subtitle"></p>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="themeToggle" class="btn-primary">Dark mode</button>
+      </div>
+    </header>
+
+    <section class="stats" id="stats"></section>
+    <hr />
+
+    <section>
+      <h2>Issues by label type</h2>
+      <p class="hint">Each issue classified by its primary category label. Source: GitHub Labels · Sprints 37–38</p>
+      <div class="grid-2">
+        <div class="pie-wrap">
+          <svg id="pie" class="pie-svg" viewBox="0 0 220 220" role="img" aria-label="Issues by label type"></svg>
+          <div class="pie-tooltip" id="pieTooltip">Hover a slice or legend item</div>
+          <div class="pie-legend" id="pieLegend"></div>
+        </div>
+        <div>
+          <h3>All labels across issues</h3>
+          <table class="label-table" id="labelTable">
+            <thead><tr><th>Label</th><th>Issues</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <hr />
+
+    <section class="filters">
+      <div class="search-wrap">
+        <span class="icon">🔍</span>
+        <input type="search" id="search" placeholder="Search issues by name or #number…" />
+      </div>
+      <div class="filter-row">
+        <label>
+          <span class="lbl">Date added</span>
+          <select id="filterDate">
+            <option value="all">All dates</option>
+            <option value="thisweek">This week (last 7 days)</option>
+            <option value="last2weeks">Last 2 weeks</option>
+            <option value="older">Older than 2 weeks</option>
+          </select>
+        </label>
+        <label>
+          <span class="lbl">Label</span>
+          <select id="filterLabel"><option value="">All labels</option></select>
+        </label>
+        <label>
+          <span class="lbl">Sprint</span>
+          <select id="filterSprint"><option value="">All sprints</option></select>
+        </label>
+      </div>
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <div class="pills">
+      <button type="button" class="pill active" data-view="cycle">Cycle time</button>
+      <button type="button" class="pill" data-view="board">Board</button>
+      <button type="button" class="pill" data-view="sprint">Sprint table</button>
+    </div>
+
+    <main id="main"></main>
+    <p class="footer">Personal board · static snapshot · regenerate with <code>python3 scripts/generate_html.py</code></p>
+  </div>
+
+  <script>
+    const BOARD = {"title": "UI Touch Grass \u2014 Cycle Time", "project": {"owner": "Kuadrant", "number": 18, "url": "https://github.com/orgs/Kuadrant/projects/18", "area": "UI Touch Grass"}, "person": {"login": "pascazzioIsAbyayalan", "name": "Grettel Pascacio"}, "fetchedAt": "2026-08-05T13:11:00Z", "issues": [{"number": 590, "title": "Details pages content heavily left-aligned", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/590", "status": "Done", "sprint": "Sprint 37", "labels": ["good first issue", "triage/accepted"], "assignedAt": "2026-07-02T16:53:45Z", "todoAt": "2026-07-02T16:52:16Z", "inProgressAt": "2026-07-06T10:00:45Z", "prNumber": 602, "prTitle": "Alignment Issue Fix", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/602", "prCreatedAt": "2026-07-06T16:31:14Z", "mergedAt": "2026-07-06T19:11:11Z", "cycleHours": 98.3, "prOpenHours": 2.7, "prSummary": {"prType": "Style / Formatting", "problem": "Header contents inside the DNS, TLS, and OIDC policy creation tabs were extremely left-aligned, mismatching the rest of the page layout.", "solution": "Identified a PatternFly `pf-m-no-padding` modifier class applied to the body wrapper of each policy header. Commenting it out restored correct alignment across all three policy pages.", "keyChanges": ["Commented out `pf-m-no-padding` class on DNS, TLS, and OIDC header wrappers", "No logic changes \u2014 pure layout fix", "Verified visually: headers now align with other page content"]}}, {"number": 572, "title": "API Product deletion type to confirm UI enhancement", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/572", "status": "Done", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-01T09:46:57Z", "todoAt": "2026-06-30T14:41:03Z", "inProgressAt": "2026-07-07T09:43:46Z", "prNumber": 609, "prTitle": "APIProduct/Key Delete UI Enhance", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/609", "prCreatedAt": "2026-07-07T15:44:26Z", "mergedAt": "2026-07-08T09:38:54Z", "cycleHours": 167.9, "prOpenHours": 17.9, "prSummary": {"prType": "Style / Formatting", "problem": "API Product and API Key deletion modals had inconsistent UI/UX \u2014 different sizes, layouts, and confirmation patterns between the two flows.", "solution": "Used the API Key modal as a consistent base and redesigned both modals to follow PatternFly's 'Confirm a destructive action' guidelines, unifying the experience across both resource types.", "keyChanges": ["Modal size reduced from medium \u2192 small for a more focused feel", "Added warning icon and simplified messaging to a single line", "Improved placeholder text: 'Enter API Product name' for better guidance", "Simplified confirm button label from 'Delete API Product' \u2192 'Delete'", "Added useEffect hook to reliably reset the confirmation field on all close methods (Cancel, ESC, click-outside)", "Reorganised imports to match project conventions; added kuadrant.css import"]}}, {"number": 571, "title": "Cancel button navigates to resource list instead of previous page", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/571", "status": "Closed", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-01T09:47:16Z", "todoAt": "2026-06-30T14:27:32Z", "inProgressAt": "2026-07-07T17:30:44Z", "prNumber": null, "prTitle": null, "prUrl": null, "prCreatedAt": null, "mergedAt": "2026-07-10T10:40:43Z", "cycleHours": 216.9, "prOpenHours": null, "prSummary": {"prType": "Closed \u2014 Won't Fix", "problem": "Cancel buttons on create/edit forms (policies, Gateways, HTTPRoutes \u2014 Form and YAML view) navigate to the resource list page instead of the previous page, breaking natural navigation flow.", "solution": "Closed as not technically feasible. The OpenShift Console SDK's ResourceYAMLEditor does not expose an onCancel prop or any way to customise the cancel button. A custom YAML editor wrapper would be fragile and unnecessary given the planned form view work.", "keyChanges": ["Custom YAML editor approach investigated and ruled out", "Textarea alternative considered and discarded", "Confirmed via SDK type definitions: cancel customisation is not supported", "Same broken behaviour found on HTTPRoutes and Gateway YAML creation", "Resolution deferred to upcoming form view redesign"]}}, {"number": 614, "title": "API Product deletion type to confirm missing when deleting from details", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/614", "status": "Done", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-08T11:43:52Z", "todoAt": "2026-07-08T11:44:25Z", "inProgressAt": "2026-07-17T08:50:45Z", "prNumber": 676, "prTitle": "Type-to-confirm APIProduct Actions Menu", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/676", "prCreatedAt": "2026-07-21T15:09:04Z", "mergedAt": "2026-07-22T09:43:16Z", "cycleHours": 334.0, "prOpenHours": 18.6, "prSummary": {"prType": "Bug Fix", "problem": "APIProduct detail page Actions dropdown used the SDK's built-in useDeleteModal (simple checkbox confirmation), while the list page kebab already used the custom type-to-confirm APIProductDeleteModal \u2014 inconsistent delete UX across views.", "solution": "Replaced useDeleteModal with the SDK's useModal hook to launch APIProductDeleteModal from the Actions dropdown, matching PatternFly's 'Confirm a destructive action' guidelines. Detail page now navigates back to the APIProducts list after successful deletion.", "keyChanges": ["Added optional onDeleteSuccess callback to APIProductDeleteModal so detail page can navigate away on success", "Moved setIsDeleting cleanup out of finally into catch only \u2014 avoids setState-on-unmount warnings", "Switched useAPIProductActions from useDeleteModal to useModal with APIProductDeleteModalWrapper", "Updated e2e delete flow to type the resource name into #confirm-delete instead of checking a checkbox"]}}, {"number": 583, "title": "Add GatewayClass filtering for gateway tables", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/583", "status": "Done", "sprint": "Sprint 38", "labels": ["enhancement", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-09T14:09:42Z", "todoAt": "2026-07-09T14:09:42Z", "inProgressAt": "2026-07-29T14:56:44Z", "prNumber": 698, "prTitle": "GatewayClass Filter Dropdown", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/698", "prCreatedAt": "2026-07-29T14:56:44Z", "mergedAt": "2026-07-30T13:59:10Z", "cycleHours": 503.8, "prOpenHours": 23.0, "prSummary": {"prType": "Feature", "problem": "Gateway tables showed all gateways including irrelevant types (e.g. waypoint gateways with gatewayClassName 'istio-waypoint'). Only Name, Namespace, and Type filters existed \u2014 no GatewayClass filter.", "solution": "Extended ResourceList with a reusable additionalFilters prop (PatternFly dropdown select), then wired a GatewayClass filter on the Overview 'Gateways - Traffic Analysis' card, populated dynamically from cluster GatewayClass resources.", "keyChanges": ["Added AdditionalFilter type and optional additionalFilters prop to ResourceList (default [])", "When an additional filter is active, toolbar text input switches to a Select dropdown with an All option", "Extended Gateway interface with spec.gatewayClassName; watch GatewayClass resources for dropdown options", "Passed GatewayClass filter into Overview gateway ResourceList comparing spec.gatewayClassName"]}}, {"number": 625, "title": "Fix hardcoded user-facing strings across policy and resource action hooks", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/625", "status": "In Progress", "sprint": "Sprint 38", "labels": ["enhancement", "good first issue", "triage/accepted"], "assignedAt": "2026-07-13T08:30:40Z", "todoAt": "2026-07-13T08:30:40Z", "inProgressAt": "2026-07-29T15:25:18Z", "prNumber": null, "prTitle": null, "prUrl": null, "prCreatedAt": null, "mergedAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 637, "title": "Upgrade to React 18", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/637", "status": "Todo", "sprint": "Sprint 38", "labels": ["enhancement", "triage/accepted", "sdk-maintenance"], "assignedAt": "2026-07-15T10:54:44Z", "todoAt": "2026-07-15T15:39:58Z", "inProgressAt": null, "prNumber": null, "prTitle": null, "prUrl": null, "prCreatedAt": null, "mergedAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 651, "title": "Migrate to @openshift-console/dynamic-plugin-sdk 4.22.0", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/651", "status": "Todo", "sprint": "Sprint 38", "labels": ["dependencies", "epic", "triage/accepted", "sdk-maintenance"], "assignedAt": "2026-07-15T10:55:08Z", "todoAt": "2026-07-15T15:45:47Z", "inProgressAt": null, "prNumber": null, "prTitle": null, "prUrl": null, "prCreatedAt": null, "mergedAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 664, "title": "docs: create CI.md to document e2e pipeline design and decisions", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/664", "status": "Todo", "sprint": "Sprint 38", "labels": ["documentation", "good first issue", "triage/accepted"], "assignedAt": "2026-07-22T10:22:56Z", "todoAt": "2026-07-22T10:22:56Z", "inProgressAt": null, "prNumber": null, "prTitle": null, "prUrl": null, "prCreatedAt": null, "mergedAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 468, "title": "DNSPolicy ProviderRefs Empty String Bypass", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/468", "status": "Todo", "sprint": "Unassigned", "labels": ["bug", "good first issue", "triage/accepted"], "assignedAt": "2026-07-29T10:45:57Z", "todoAt": "2026-07-29T10:45:57Z", "inProgressAt": null, "prNumber": null, "prTitle": null, "prUrl": null, "prCreatedAt": null, "mergedAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}]};
+    const ISSUES = BOARD.issues || [];
+    const STATUS_ORDER = ["Todo", "In Progress", "Ready for Review", "Done", "Closed"];
+    const OPEN_ORDER = ["In Progress", "Ready for Review", "Todo"];
+    const PRIMARY_LABELS = ["enhancement", "bug", "documentation", "dependencies", "epic"];
+
+    function fmtDate(iso) { return (iso || "").slice(0, 10) || "—"; }
+    function fmtTime(iso) { return iso ? iso.slice(11, 16) + " UTC" : ""; }
+    function fmtHours(h) {
+      if (h == null || Number.isNaN(h)) return "—";
+      if (h < 24) return h.toFixed(1) + "h";
+      const d = Math.floor(h / 24);
+      const rem = h % 24;
+      return rem < 1 ? d + "d" : d + "d " + rem.toFixed(0) + "h";
+    }
+    function escapeHtml(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function badgeClass(status) {
+      if (status === "In Progress") return "ip";
+      if (status === "Ready for Review") return "review";
+      if (status === "Done") return "done";
+      if (status === "Closed") return "closed";
+      return "todo";
+    }
+    function cardClass(status) { return badgeClass(status) === "review" ? "todo" : badgeClass(status); }
+
+    function getTheme() { return localStorage.getItem("ctb-theme") || "light"; }
+    function setTheme(theme) {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("ctb-theme", theme);
+      document.getElementById("themeToggle").textContent = theme === "light" ? "Dark mode" : "Light mode";
+    }
+
+    function primaryCategory(issue) {
+      const labels = issue.labels || [];
+      if (labels.includes("enhancement")) return "Enhancement";
+      if (labels.includes("documentation")) return "Documentation";
+      if (labels.includes("bug")) return "Bug";
+      if (labels.includes("dependencies") || labels.includes("epic")) return "Dependency/Epic";
+      return "Uncategorized";
+    }
+
+    let pieEntries = [];
+    let pieHover = null;
+
+    function pieColors() {
+      return getTheme() === "dark"
+        ? ["#9b7fd4", "#52c5ad", "#f59e0b", "#7aa2f7", "#a0a4ab"]
+        : ["#c4a8f5", "#52c5ad", "#f59e0b", "#7aa2f7", "#b0b0b0"];
+    }
+
+    function polar(cx, cy, r, angle) {
+      return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+    }
+
+    function donutSlicePath(cx, cy, rOuter, rInner, a0, a1) {
+      const large = a1 - a0 > Math.PI ? 1 : 0;
+      const [x0, y0] = polar(cx, cy, rOuter, a0);
+      const [x1, y1] = polar(cx, cy, rOuter, a1);
+      const [x2, y2] = polar(cx, cy, rInner, a1);
+      const [x3, y3] = polar(cx, cy, rInner, a0);
+      return [
+        `M ${x0} ${y0}`,
+        `A ${rOuter} ${rOuter} 0 ${large} 1 ${x1} ${y1}`,
+        `L ${x2} ${y2}`,
+        `A ${rInner} ${rInner} 0 ${large} 0 ${x3} ${y3}`,
+        "Z",
+      ].join(" ");
+    }
+
+    function setPieHover(label) {
+      pieHover = label;
+      const svg = document.getElementById("pie");
+      svg.querySelectorAll(".pie-slice").forEach(el => {
+        const hot = label && el.dataset.label === label;
+        el.classList.toggle("hot", !!hot);
+        el.classList.toggle("dim", !!label && !hot);
+      });
+      document.querySelectorAll("#pieLegend button").forEach(btn => {
+        const hot = label && btn.dataset.label === label;
+        btn.classList.toggle("hot", !!hot);
+        btn.classList.toggle("dim", !!label && !hot);
+      });
+      const tip = document.getElementById("pieTooltip");
+      if (!label) {
+        tip.classList.remove("active");
+        tip.textContent = "Hover a slice or legend item";
+        return;
+      }
+      const total = pieEntries.reduce((s, e) => s + e.value, 0) || 1;
+      const entry = pieEntries.find(e => e.label === label);
+      if (!entry) return;
+      const pct = ((entry.value / total) * 100).toFixed(1);
+      tip.classList.add("active");
+      tip.innerHTML = `<strong>${escapeHtml(entry.label)}</strong> · ${entry.value} (${pct}%)`;
+    }
+
+    function drawPie(counts) {
+      const colors = pieColors();
+      pieEntries = Object.entries(counts)
+        .filter(([, v]) => v > 0)
+        .map(([label, value], idx) => ({ label, value, color: colors[idx % colors.length] }));
+      const total = pieEntries.reduce((s, e) => s + e.value, 0) || 1;
+      const svg = document.getElementById("pie");
+      const cx = 110, cy = 110, rOuter = 90, rInner = 52;
+      let angle = -Math.PI / 2;
+      const slices = pieEntries.map(entry => {
+        const sweep = (entry.value / total) * Math.PI * 2;
+        const a0 = angle;
+        const a1 = angle + sweep;
+        angle = a1;
+        return { ...entry, a0, a1, d: donutSlicePath(cx, cy, rOuter, rInner, a0, a1) };
+      });
+      svg.innerHTML = slices.map(s =>
+        `<path class="pie-slice" data-label="${escapeHtml(s.label)}" d="${s.d}" fill="${s.color}"></path>`
+      ).join("") + `
+        <circle cx="${cx}" cy="${cy}" r="${rInner - 1}" fill="var(--bg)"></circle>
+        <text class="pie-center-text" x="${cx}" y="${cy - 2}">${total}</text>
+        <text class="pie-center-sub" x="${cx}" y="${cy + 16}">issues</text>`;
+      svg.querySelectorAll(".pie-slice").forEach(el => {
+        el.addEventListener("mouseenter", () => setPieHover(el.dataset.label));
+        el.addEventListener("mouseleave", () => setPieHover(null));
+      });
+      document.getElementById("pieLegend").innerHTML = pieEntries.map(e =>
+        `<button type="button" data-label="${escapeHtml(e.label)}">
+          <span class="sw" style="background:${e.color}"></span>${escapeHtml(e.label)}
+          <span style="color:var(--grey)">${e.value}</span>
+        </button>`
+      ).join("");
+      document.querySelectorAll("#pieLegend button").forEach(btn => {
+        btn.addEventListener("mouseenter", () => setPieHover(btn.dataset.label));
+        btn.addEventListener("mouseleave", () => setPieHover(null));
+      });
+      if (pieHover) setPieHover(pieHover);
+    }
+
+    function renderLabelSection() {
+      const cat = {};
+      const labelCounts = {};
+      ISSUES.forEach(i => {
+        const c = primaryCategory(i);
+        cat[c] = (cat[c] || 0) + 1;
+        (i.labels || []).forEach(l => { labelCounts[l] = (labelCounts[l] || 0) + 1; });
+      });
+      drawPie(cat);
+      const rows = Object.entries(labelCounts).sort((a, b) => b[1] - a[1]);
+      document.querySelector("#labelTable tbody").innerHTML = rows.map(([l, n]) =>
+        `<tr><td>${escapeHtml(l)}</td><td>${n}</td></tr>`
+      ).join("");
+    }
+
+    function filteredIssues() {
+      const q = document.getElementById("search").value.trim().toLowerCase();
+      const label = document.getElementById("filterLabel").value;
+      const sprint = document.getElementById("filterSprint").value;
+      const date = document.getElementById("filterDate").value;
+      const now = Date.now();
+      const day = 86400000;
+      return ISSUES.filter(issue => {
+        if (q && !issue.title.toLowerCase().includes(q) && !String(issue.number).includes(q)) return false;
+        if (label && !(issue.labels || []).includes(label)) return false;
+        if (sprint && issue.sprint !== sprint) return false;
+        if (date !== "all") {
+          const ms = new Date(issue.todoAt || issue.assignedAt).getTime();
+          if (date === "thisweek" && ms < now - 7 * day) return false;
+          if (date === "last2weeks" && ms < now - 14 * day) return false;
+          if (date === "older" && ms >= now - 14 * day) return false;
+        }
+        return true;
+      });
+    }
+
+    function timelineBar(issue) {
+      const todoMs = new Date(issue.todoAt || issue.assignedAt).getTime();
+      const inProgMs = issue.inProgressAt ? new Date(issue.inProgressAt).getTime() : null;
+      const prMs = issue.prCreatedAt ? new Date(issue.prCreatedAt).getTime() : null;
+      const mergedMs = issue.mergedAt ? new Date(issue.mergedAt).getTime() : null;
+      const endMs = mergedMs || Date.now();
+      const total = Math.max(endMs - todoMs, 1);
+      const todoPct = inProgMs ? ((inProgMs - todoMs) / total) * 100 : 100;
+      const inProgEnd = prMs || mergedMs || Date.now();
+      const inProgPct = inProgMs ? ((inProgEnd - inProgMs) / total) * 100 : 0;
+      const reviewPct = prMs && mergedMs ? ((mergedMs - prMs) / total) * 100 : 0;
+      const todoHrs = inProgMs ? (inProgMs - todoMs) / 3600000 : (endMs - todoMs) / 3600000;
+      const inProgHrs = inProgMs ? (inProgEnd - inProgMs) / 3600000 : 0;
+      const reviewHrs = prMs && mergedMs ? (mergedMs - prMs) / 3600000 : 0;
+
+      return `<div class="bar-wrap">
+        <div class="bar">
+          <div class="seg-todo" style="width:${todoPct}%;${inProgMs ? "" : "border-radius:5px"}" title="Todo: ${fmtHours(todoHrs)}"></div>
+          ${inProgPct > 0 ? `<div class="seg-ip" style="width:${inProgPct}%" title="In Progress: ${fmtHours(inProgHrs)}"></div>` : ""}
+          ${reviewPct > 0 ? `<div class="seg-review" style="width:${reviewPct}%" title="Review: ${fmtHours(reviewHrs)}"></div>` : ""}
+          ${inProgMs ? `<div class="bar-marker" style="left:${todoPct}%"></div>` : ""}
+        </div>
+        <div class="bar-phase">
+          <span class="left"><strong>Todo</strong><span>${fmtDate(issue.todoAt || issue.assignedAt)}</span><span>${fmtHours(todoHrs)}</span></span>
+          ${inProgMs ? `<span class="mid" style="left:calc(${todoPct}% + 4px)"><span class="ip-lab">▶ In Progress</span><span>${fmtDate(issue.inProgressAt)}</span>${inProgHrs > 0 ? `<span>${fmtHours(inProgHrs)}</span>` : ""}</span>` : ""}
+          <span class="right">${mergedMs
+            ? `<span class="merged">Merged</span><span>${fmtDate(issue.mergedAt)}</span>${reviewHrs > 0 ? `<span>Review ${fmtHours(reviewHrs)}</span>` : ""}`
+            : `<span style="font-style:italic">now…</span>`}</span>
+        </div>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--lavender)"></i>Todo</span>
+          ${inProgMs ? `<span><i class="swatch" style="background:var(--amber)"></i>In Progress</span>` : ""}
+          ${reviewPct > 0 ? `<span><i class="swatch" style="background:var(--mint-deep)"></i>Review</span>` : ""}
+        </div>
+      </div>`;
+    }
+
+    function labelChips(labels) {
+      return (labels || []).map(l =>
+        `<span class="chip${l === "maintainers-only" ? " hot" : ""}">${escapeHtml(l)}</span>`
+      ).join("");
+    }
+
+    function summaryBlock(issue) {
+      const s = issue.prSummary;
+      if (!s || (!s.problem && !s.solution && !(s.keyChanges || []).length)) return "";
+      const id = `sum-${issue.number}`;
+      const closed = issue.status === "Closed" || (s.prType || "").startsWith("Closed");
+      return `<div>
+        <button type="button" class="summary-toggle" data-target="${id}">
+          <span class="arrow">▶</span>
+          ${closed ? "Closing Summary" : "PR Solution Summary"}
+          <span style="margin-left:auto;font-size:10px;color:var(--grey);font-weight:400" class="hint-toggle">show</span>
+        </button>
+        <div class="summary-body" id="${id}" hidden>
+          <span class="tag${closed ? " closed" : ""}">${escapeHtml(s.prType || "Pull Request")}</span>
+          ${s.problem ? `<div class="sec"><div class="k">Problem</div><div>${escapeHtml(s.problem)}</div></div>` : ""}
+          ${s.solution ? `<div class="sec"><div class="k">Solution</div><div>${escapeHtml(s.solution)}</div></div>` : ""}
+          ${(s.keyChanges || []).length ? `<div class="sec"><div class="k">Key Changes</div><ul>${s.keyChanges.map(c => `<li>✓ ${escapeHtml(c)}</li>`).join("")}</ul></div>` : ""}
+        </div>
+      </div>`;
+    }
+
+    function sectionOpen(key, fallback = true) {
+      const v = localStorage.getItem(key);
+      return v == null ? fallback : v === "1";
+    }
+    function setSectionOpen(key, open) {
+      localStorage.setItem(key, open ? "1" : "0");
+    }
+
+    function renderCycle(issues) {
+      const open = issues.filter(i => i.status !== "Done" && i.status !== "Closed")
+        .sort((a, b) => OPEN_ORDER.indexOf(a.status) - OPEN_ORDER.indexOf(b.status));
+      const done = issues.filter(i => i.status === "Done" || i.status === "Closed");
+      const openExpanded = sectionOpen("ctb-open", true);
+      const doneExpanded = sectionOpen("ctb-done", true);
+      let html = "";
+      if (open.length) {
+        html += `<button type="button" class="section-toggle" data-section="open">
+            <span class="arrow${openExpanded ? " open" : ""}">▶</span>
+            <span>
+              <h2>Open issues (${open.length})</h2>
+              <p class="hint">In Progress first, then Ready for Review / Todo. Time elapsed since assignment — no PR merged yet.</p>
+            </span>
+          </button>
+          <div class="section-body${openExpanded ? " open" : ""}" id="section-open">`;
+        html += open.map(issue => {
+          const openH = (Date.now() - new Date(issue.assignedAt).getTime()) / 3600000;
+          return `<article class="card ${cardClass(issue.status)}">
+            <div class="card-head">
+              <span class="num">#${issue.number}</span>
+              <span class="spacer"></span>
+              <span style="font-size:11px;color:var(--grey)">Open: <strong>${fmtHours(openH)}</strong></span>
+              <span class="badge ${badgeClass(issue.status)}">${issue.status}</span>
+            </div>
+            <div class="title">${escapeHtml(issue.title)}</div>
+            ${timelineBar(issue)}
+            <div class="meta two">
+              <div><div class="k">Assigned</div>${fmtDate(issue.assignedAt)}<div class="sub">${fmtTime(issue.assignedAt)}</div></div>
+              <div><div class="k">Status</div><span class="badge ${badgeClass(issue.status)}">${issue.status}</span></div>
+            </div>
+            <div class="labels">${labelChips(issue.labels)}</div>
+          </article>`;
+        }).join("");
+        html += `</div>`;
+      }
+      if (done.length) {
+        html += `<button type="button" class="section-toggle" data-section="done">
+            <span class="arrow${doneExpanded ? " open" : ""}">▶</span>
+            <span>
+              <h2>Completed issues (${done.length})</h2>
+              <p class="hint">Time from project "Todo" entry to resolution. Bar segments: <span style="color:var(--amber);font-weight:600">■ In Progress</span> · <span style="font-weight:600">■ Review / Closed</span>. Amber tick marks the Todo → In Progress transition.</p>
+            </span>
+          </button>
+          <div class="section-body${doneExpanded ? " open" : ""}" id="section-done">`;
+        html += done.map(issue => {
+          const after = issue.prCreatedAt
+            ? fmtHours((new Date(issue.prCreatedAt) - new Date(issue.assignedAt)) / 3600000)
+            : null;
+          return `<article class="card ${cardClass(issue.status)}">
+            <div class="card-head">
+              <span class="num">#${issue.number}</span>
+              <span class="spacer"></span>
+              <span style="font-size:11px;color:var(--grey)">Total: <strong>${fmtHours(issue.cycleHours)}</strong></span>
+              <span class="badge ${badgeClass(issue.status)}">${issue.status}</span>
+            </div>
+            <div class="title">${escapeHtml(issue.title)}</div>
+            ${timelineBar(issue)}
+            <div class="meta">
+              <div><div class="k">Assigned</div>${fmtDate(issue.assignedAt)}<div class="sub">${fmtTime(issue.assignedAt)}</div></div>
+              <div><div class="k">PR opened</div>${fmtDate(issue.prCreatedAt)}${issue.prCreatedAt ? `<div class="sub">${fmtTime(issue.prCreatedAt)} · after ${after} of work</div>` : ""}</div>
+              <div><div class="k">Merged</div>${fmtDate(issue.mergedAt)}${issue.mergedAt && issue.prCreatedAt ? `<div class="sub">${fmtTime(issue.mergedAt)} · PR open for ${fmtHours(issue.prOpenHours)}</div>` : ""}</div>
+            </div>
+            ${issue.prNumber ? `<div style="margin-top:8px;font-size:11px;color:var(--grey)">PR <a href="${issue.prUrl}" target="_blank" rel="noopener">#${issue.prNumber} ${escapeHtml(issue.prTitle || "")}</a></div>` : ""}
+            <div class="labels">${labelChips(issue.labels)}</div>
+            ${summaryBlock(issue)}
+          </article>`;
+        }).join("");
+        html += `</div>`;
+      }
+      return html || emptyState();
+    }
+
+    function renderBoard(issues) {
+      return `<div class="board">${STATUS_ORDER.map(status => {
+        const items = issues.filter(i => i.status === status);
+        return `<div class="col">
+          <h3 style="${status === "In Progress" ? "color:var(--amber-text)" : ""}">${status} <span class="count">${items.length}</span></h3>
+          <div class="col-line ${badgeClass(status)}"></div>
+          ${items.length === 0 ? `<div style="font-size:12px;color:var(--grey);font-style:italic">—</div>` : items.map(i => `
+            <div class="mini-card ${cardClass(i.status)}">
+              <div class="card-head">
+                <a class="num" href="${i.url}" target="_blank" rel="noopener">#${i.number}</a>
+                <span class="spacer"></span>
+                ${i.cycleHours != null ? `<span style="font-size:10px;color:var(--grey)">${fmtHours(i.cycleHours)}</span>` : ""}
+              </div>
+              <div class="title${i.status === "Done" || i.status === "Closed" ? " strike" : ""}">${escapeHtml(i.title)}</div>
+              ${i.prNumber ? `<a href="${i.prUrl}" style="font-size:10px" target="_blank" rel="noopener">PR #${i.prNumber}</a>` : ""}
+            </div>`).join("")}
+        </div>`;
+      }).join("")}</div>`;
+    }
+
+    function renderSprint(issues) {
+      return `<h2>Sprint table — ${issues.length} issue${issues.length === 1 ? "" : "s"}</h2>
+      <table class="sprint">
+        <thead><tr>
+          <th>#</th><th>Title</th><th>Status</th><th>Labels</th><th>Assigned</th><th>PR Opened</th><th>Merged</th><th>Cycle Time</th><th>PR Review</th>
+        </tr></thead>
+        <tbody>${issues.map(i => `<tr>
+          <td><a href="${i.url}" target="_blank" rel="noopener">#${i.number}</a></td>
+          <td>${escapeHtml(i.title)}</td>
+          <td><span class="badge ${badgeClass(i.status)}">${i.status}</span></td>
+          <td><div class="labels">${labelChips((i.labels || []).filter(l => l !== "good first issue"))}</div></td>
+          <td>${fmtDate(i.assignedAt)}</td>
+          <td>${fmtDate(i.prCreatedAt)}</td>
+          <td>${fmtDate(i.mergedAt)}</td>
+          <td><strong>${i.cycleHours != null ? fmtHours(i.cycleHours) : fmtHours((Date.now() - new Date(i.assignedAt).getTime()) / 3600000) + "+"}</strong></td>
+          <td>${i.prOpenHours != null ? fmtHours(i.prOpenHours) : "—"}</td>
+        </tr>`).join("")}</tbody>
+      </table>`;
+    }
+
+    function emptyState() {
+      return `<div class="empty">
+        <div style="font-size:32px;margin-bottom:8px">🔍</div>
+        <div style="font-weight:600">No issues match your filters</div>
+        <div class="hint" style="margin-top:4px">Try adjusting the search or clearing a filter.</div>
+        <button type="button" id="clearEmpty" style="margin-top:12px;padding:6px 14px;border-radius:6px;background:var(--lavender)">Clear all filters</button>
+      </div>`;
+    }
+
+    let view = localStorage.getItem("ctb-view") || "cycle";
+
+    function renderChips(filtered) {
+      const search = document.getElementById("search").value.trim();
+      const label = document.getElementById("filterLabel").value;
+      const sprint = document.getElementById("filterSprint").value;
+      const date = document.getElementById("filterDate").value;
+      const has = search || label || sprint || date !== "all";
+      let html = `<span>${filtered.length === ISSUES.length ? `${ISSUES.length} issues` : `${filtered.length} of ${ISSUES.length} issues`}</span>`;
+      if (search) html += `<span class="chip-x" style="background:var(--lavender)">"${escapeHtml(search)}" <button data-clear="search">✕</button></span>`;
+      if (label) html += `<span class="chip-x" style="background:var(--mint)">${escapeHtml(label)} <button data-clear="label">✕</button></span>`;
+      if (sprint) html += `<span class="chip-x" style="background:var(--blush)">${escapeHtml(sprint)} <button data-clear="sprint">✕</button></span>`;
+      if (date !== "all") html += `<span class="chip-x" style="background:var(--amber-soft);color:var(--amber-text)">${date === "thisweek" ? "This week" : date === "last2weeks" ? "Last 2 weeks" : "Older"} <button data-clear="date">✕</button></span>`;
+      if (has) html += `<button type="button" id="clearAll" style="all:unset;cursor:pointer;font-size:11px;color:var(--grey);text-decoration:underline">Clear all</button>`;
+      document.getElementById("chips").innerHTML = html;
+    }
+
+    function render() {
+      const filtered = filteredIssues();
+      const resolved = ISSUES.filter(i => i.status === "Done" || i.status === "Closed");
+      const done = ISSUES.filter(i => i.status === "Done");
+      const avgCycle = resolved.length ? resolved.reduce((s, i) => s + (i.cycleHours || 0), 0) / resolved.length : null;
+      const avgPR = done.length ? done.reduce((s, i) => s + (i.prOpenHours || 0), 0) / done.length : null;
+
+      document.getElementById("title").textContent = BOARD.title;
+      document.getElementById("subtitle").innerHTML =
+        `Kuadrant / kuadrant-console-plugin · Sprints 37–38 · <a href="${BOARD.project.url}" target="_blank" rel="noopener">Project #${BOARD.project.number}</a> · Last fetched ${fmtDate(BOARD.fetchedAt)}`;
+
+      document.getElementById("stats").innerHTML = [
+        [ISSUES.length, "Issues assigned"],
+        [resolved.length, "Resolved"],
+        [fmtHours(avgCycle), "Avg assigned → resolved"],
+        [done.length ? fmtHours(avgPR) : "—", "Avg PR open → merged"],
+      ].map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+      renderChips(filtered);
+      const main = document.getElementById("main");
+      if (!filtered.length) main.innerHTML = emptyState();
+      else if (view === "board") main.innerHTML = renderBoard(filtered);
+      else if (view === "sprint") main.innerHTML = renderSprint(filtered);
+      else main.innerHTML = renderCycle(filtered);
+
+      document.querySelectorAll(".pill").forEach(p => p.classList.toggle("active", p.dataset.view === view));
+      bindDynamic();
+    }
+
+    function clearAll() {
+      document.getElementById("search").value = "";
+      document.getElementById("filterLabel").value = "";
+      document.getElementById("filterSprint").value = "";
+      document.getElementById("filterDate").value = "all";
+      render();
+    }
+
+    function bindDynamic() {
+      document.querySelectorAll(".section-toggle").forEach(btn => {
+        btn.onclick = () => {
+          const key = btn.dataset.section === "open" ? "ctb-open" : "ctb-done";
+          const body = document.getElementById(`section-${btn.dataset.section}`);
+          const open = !body.classList.contains("open");
+          body.classList.toggle("open", open);
+          btn.querySelector(".arrow").classList.toggle("open", open);
+          setSectionOpen(key, open);
+        };
+      });
+      document.querySelectorAll(".summary-toggle").forEach(btn => {
+        btn.onclick = () => {
+          const body = document.getElementById(btn.dataset.target);
+          const open = body.hidden;
+          body.hidden = !open;
+          btn.classList.toggle("open", open);
+          btn.querySelector(".arrow").style.transform = open ? "rotate(90deg)" : "";
+          btn.querySelector(".hint-toggle").textContent = open ? "hide" : "show";
+        };
+      });
+      document.querySelectorAll("[data-clear]").forEach(btn => {
+        btn.onclick = () => {
+          const k = btn.dataset.clear;
+          if (k === "search") document.getElementById("search").value = "";
+          if (k === "label") document.getElementById("filterLabel").value = "";
+          if (k === "sprint") document.getElementById("filterSprint").value = "";
+          if (k === "date") document.getElementById("filterDate").value = "all";
+          render();
+        };
+      });
+      const clearBtn = document.getElementById("clearAll") || document.getElementById("clearEmpty");
+      if (clearBtn) clearBtn.onclick = clearAll;
+    }
+
+    function initFilters() {
+      const labels = [...new Set(ISSUES.flatMap(i => i.labels || []))].sort();
+      const sprints = [...new Set(ISSUES.map(i => i.sprint).filter(Boolean))].sort();
+      document.getElementById("filterLabel").innerHTML =
+        `<option value="">All labels</option>` + labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join("");
+      document.getElementById("filterSprint").innerHTML =
+        `<option value="">All sprints</option>` + sprints.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+    }
+
+    document.getElementById("themeToggle").onclick = () => {
+      setTheme(getTheme() === "light" ? "dark" : "light");
+      renderLabelSection();
+    };
+    ["search", "filterLabel", "filterSprint", "filterDate"].forEach(id => {
+      document.getElementById(id).addEventListener(id === "search" ? "input" : "change", render);
+    });
+    document.querySelectorAll(".pill").forEach(p => p.addEventListener("click", () => {
+      view = p.dataset.view;
+      localStorage.setItem("ctb-view", view);
+      render();
+    }));
+
+    setTheme(getTheme());
+    initFilters();
+    renderLabelSection();
+    render();
+  </script>
+</body>
+</html>
