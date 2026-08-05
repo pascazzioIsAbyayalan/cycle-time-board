@@ -18,6 +18,7 @@ DATA_DIR = ROOT / "data" / "people"
 DEFAULT_CONFIG: dict = {
     "title": "Cycle Time Board",
     "project": None,
+    "projects": [],
     "repos": [],
 }
 
@@ -51,6 +52,44 @@ def github_viewer() -> dict:
     return user
 
 
+def normalize_projects(cfg: dict) -> list[dict]:
+    """Return a list of project dicts from boards.json (supports legacy single project)."""
+    projects = cfg.get("projects")
+    if isinstance(projects, list) and projects:
+        out = []
+        for p in projects:
+            if not isinstance(p, dict) or not p.get("owner") or p.get("number") is None:
+                continue
+            item = {
+                "owner": p["owner"],
+                "number": int(p["number"]),
+                "url": p.get("url")
+                or f"https://github.com/orgs/{p['owner']}/projects/{p['number']}",
+            }
+            if p.get("title"):
+                item["title"] = p["title"]
+            if p.get("area"):
+                item["area"] = p["area"]
+            out.append(item)
+        if out:
+            return out
+
+    project = cfg.get("project")
+    if isinstance(project, dict) and project.get("owner") and project.get("number") is not None:
+        item = {
+            "owner": project["owner"],
+            "number": int(project["number"]),
+            "url": project.get("url")
+            or f"https://github.com/orgs/{project['owner']}/projects/{project['number']}",
+        }
+        if project.get("title"):
+            item["title"] = project["title"]
+        if project.get("area"):
+            item["area"] = project["area"]
+        return [item]
+    return []
+
+
 def load_config(boards_path: Path | None = None) -> dict:
     """Load boards.json (required for project selection)."""
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))
@@ -62,25 +101,37 @@ def load_config(boards_path: Path | None = None) -> dict:
                 base = cfg.get("project") if isinstance(cfg.get("project"), dict) else {}
                 merged = {**(base or {}), **value}
                 cfg["project"] = merged
+            elif key == "projects" and isinstance(value, list):
+                cfg["projects"] = value
             else:
                 cfg[key] = value
+    # Keep project + projects in sync for consumers
+    projects = normalize_projects(cfg)
+    cfg["projects"] = projects
+    cfg["project"] = projects[0] if projects else None
     return cfg
 
 
 def require_project(cfg: dict) -> dict:
-    """Return project dict or exit with setup instructions."""
-    project = cfg.get("project")
-    if not isinstance(project, dict) or not project.get("owner") or not project.get("number"):
+    """Return the primary project dict (first selected) or exit with setup instructions."""
+    projects = require_projects(cfg)
+    return projects[0]
+
+
+def require_projects(cfg: dict) -> list[dict]:
+    """Return selected projects or exit with setup instructions."""
+    projects = normalize_projects(cfg)
+    if not projects:
         print(
             "No GitHub Project selected yet.\n\n"
-            "Pick a board you have access to:\n"
+            "Pick board(s) you have access to:\n"
             "  python3 scripts/configure.py\n\n"
-            "That writes boards.json (owner, project number, repos).\n"
+            "That writes boards.json (projects + repos).\n"
             "See boards.example.json for the file shape.",
             file=sys.stderr,
         )
         raise SystemExit(2)
-    return project
+    return projects
 
 
 def require_repos(cfg: dict) -> list[str]:

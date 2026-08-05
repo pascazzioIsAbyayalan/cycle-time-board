@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Configure Cycle Time Board</title>
+  <style>
+    :root {
+      --blush: #fff0f8;
+      --lavender: #ebe0fc;
+      --mint: #d4f5ee;
+      --grey: #707070;
+      --charcoal: #333333;
+      --lavender-deep: #c4a8f5;
+      --mint-deep: #52c5ad;
+      --blush-border: #e8c8e0;
+      --bg: #f7f5f8;
+      --surface: #ffffff;
+      --danger: #b45309;
+      --danger-bg: #fff7ed;
+      --menu-border: #d0d7de;
+      --menu-hover: #f6f8fa;
+      --menu-selected: #ddf4ff;
+      --accent: #0969da;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--charcoal);
+      line-height: 1.45;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 48px; }
+    .header {
+      background: var(--lavender);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 20px;
+    }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    .header p { margin: 6px 0 0; font-size: 13px; color: var(--grey); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--blush-border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 15px; font-weight: 700; }
+    .muted { color: var(--grey); font-size: 13px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px;
+      background: var(--mint); font-size: 12px; font-weight: 600;
+    }
+    .pill.off { background: var(--blush); color: var(--grey); }
+    label.field {
+      display: block; margin: 12px 0 6px;
+      font-size: 13px; font-weight: 600;
+    }
+    input[type="text"] {
+      width: 100%; font: inherit; color: var(--charcoal);
+      background: var(--surface); border: 1.5px solid var(--blush-border);
+      border-radius: 7px; padding: 9px 12px; outline: none;
+    }
+    input[type="text"]:focus { border-color: var(--lavender-deep); }
+    button {
+      font: inherit; cursor: pointer; color: var(--charcoal);
+      background: var(--surface); border: 1.5px solid var(--blush-border);
+      border-radius: 7px; padding: 8px 14px;
+    }
+    button:hover { border-color: var(--lavender-deep); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary {
+      background: var(--mint); border-color: var(--mint-deep); font-weight: 600;
+    }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .projects {
+      display: flex; flex-direction: column; gap: 8px;
+      max-height: 280px; overflow: auto; padding-right: 4px;
+    }
+    .project {
+      display: grid; grid-template-columns: auto 1fr; gap: 10px;
+      align-items: start; border: 1.5px solid var(--blush-border);
+      border-radius: 8px; padding: 10px 12px; cursor: pointer;
+    }
+    .project:hover { border-color: var(--lavender-deep); }
+    .project.selected {
+      border-color: var(--mint-deep); background: #f3fcf9;
+    }
+    .project input { margin-top: 3px; }
+    .project .title { font-weight: 600; font-size: 14px; }
+    .project .meta { font-size: 12px; color: var(--grey); margin-top: 2px; }
+    .project a { color: var(--grey); }
+    .banner {
+      border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px;
+    }
+    .banner.error { background: var(--danger-bg); color: var(--danger); }
+    .banner.ok { background: var(--mint); color: var(--charcoal); }
+    .banner.info { background: var(--lavender); color: var(--charcoal); }
+    .hidden { display: none !important; }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--blush-border); border-top-color: var(--mint-deep);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: -2px; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px; background: var(--blush); padding: 1px 5px; border-radius: 4px;
+    }
+
+    /* GitHub-style repo switcher */
+    .repo-picker { position: relative; margin-top: 4px; }
+    .repo-trigger {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; text-align: left; padding: 9px 12px;
+      border: 1.5px solid var(--blush-border); border-radius: 7px; background: var(--surface);
+    }
+    .repo-trigger:hover { border-color: var(--lavender-deep); }
+    .repo-trigger .summary { font-size: 13px; }
+    .repo-trigger .chev { color: var(--grey); font-size: 12px; }
+    .repo-menu {
+      position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px);
+      background: #fff; border: 1px solid var(--menu-border); border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+      overflow: hidden;
+    }
+    .repo-menu-head {
+      padding: 10px 12px 8px; border-bottom: 1px solid var(--menu-border);
+      font-size: 12px; font-weight: 600;
+    }
+    .repo-search-wrap { padding: 8px 12px 10px; border-bottom: 1px solid var(--menu-border); }
+    .repo-search-wrap input {
+      width: 100%; border: 1px solid var(--accent); border-radius: 6px;
+      padding: 7px 10px 7px 30px; font: inherit; font-size: 13px;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16'%3E%3Cpath fill='%236e7781' d='M10.68 11.74a6 6 0 1 1 1.06-1.06l3.04 3.04a.75.75 0 1 1-1.06 1.06l-3.04-3.04ZM11.5 7a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z'/%3E%3C/svg%3E") 10px center no-repeat;
+      outline: none;
+    }
+    .repo-list { max-height: 260px; overflow: auto; padding: 4px 0; }
+    .repo-item {
+      display: grid; grid-template-columns: 22px 16px 1fr; gap: 8px;
+      align-items: center; padding: 8px 12px; cursor: pointer; font-size: 13px;
+      border: none; background: transparent; width: 100%; text-align: left;
+    }
+    .repo-item:hover { background: var(--menu-hover); }
+    .repo-item.selected {
+      background: var(--menu-selected);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .repo-item .check { color: var(--accent); font-size: 13px; visibility: hidden; }
+    .repo-item.selected .check { visibility: visible; }
+    .repo-item .icon { color: var(--grey); font-size: 12px; }
+    .repo-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .repo-empty { padding: 16px 12px; font-size: 13px; color: var(--grey); }
+    .repo-footer {
+      padding: 8px 12px; border-top: 1px solid var(--menu-border);
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .repo-footer button { padding: 5px 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <h1>Configure your board</h1>
+      <p>Sign in, pick one or more Projects you can access, choose repositories, then save.</p>
+    </header>
+
+    <div id="banner" class="banner hidden"></div>
+    <div id="buildPanel" class="card hidden">
+      <h2>Build progress</h2>
+      <p id="buildMsg" class="muted"><span class="spinner"></span> Working…</p>
+      <p id="buildLink" class="hidden" style="margin-top:10px"></p>
+    </div>
+
+    <section class="card" id="authCard">
+      <h2>1. GitHub account</h2>
+      <div class="row" id="authRow">
+        <span class="spinner"></span>
+        <span class="muted">Checking authentication…</span>
+      </div>
+    </section>
+
+    <section class="card" id="setupCard">
+      <h2>2. Choose Project(s)</h2>
+      <p class="muted" id="projectsHint">Select one or more Projects from your user account and organizations.</p>
+      <div id="projectsBox" class="projects" style="margin-top:12px">
+        <div class="muted"><span class="spinner"></span>Loading projects…</div>
+      </div>
+
+      <label class="field">Repositories to scan</label>
+      <p class="muted" style="margin:0 0 8px">Assigned issues from these repos. Pick from owners of your selected Projects.</p>
+      <div class="repo-picker" id="repoPicker">
+        <button type="button" class="repo-trigger" id="repoTrigger" disabled>
+          <span class="summary" id="repoSummary">Select repositories…</span>
+          <span class="chev">▾</span>
+        </button>
+        <div class="repo-menu hidden" id="repoMenu">
+          <div class="repo-menu-head">Switch repositories</div>
+          <div class="repo-search-wrap">
+            <input type="search" id="repoSearch" placeholder="Search repositories" autocomplete="off" />
+          </div>
+          <div class="repo-list" id="repoList">
+            <div class="repo-empty">Select a Project above to load repositories.</div>
+          </div>
+          <div class="repo-footer">
+            <span class="muted" id="repoCount">0 selected</span>
+            <button type="button" id="repoDone">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <label class="field" for="title">Board title</label>
+      <input id="title" type="text" placeholder="My Teams — Cycle Time" autocomplete="off" />
+
+      <label class="field" for="area">Area filter <span class="muted">(optional — leave blank for all areas)</span></label>
+      <input id="area" type="text" placeholder="e.g. UI Touch Grass" autocomplete="off" />
+
+      <div class="actions">
+        <button type="button" class="primary" id="btnBuild" disabled>Save and build board</button>
+        <button type="button" id="btnSave" disabled>Save only</button>
+        <button type="button" id="btnReload">Reload projects</button>
+      </div>
+      <p class="muted" style="margin-top:12px">
+        Writes local <code>boards.json</code>. “Save and build” runs fetch + generate (can take a minute with several repos).
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let projects = [];
+    let selectedKeys = new Set();
+    let availableRepos = [];
+    let selectedRepos = new Set();
+    let busy = false;
+    let reposLoading = false;
+
+    function showBanner(kind, text) {
+      const el = $("banner");
+      el.className = "banner " + kind;
+      el.textContent = text;
+      el.classList.remove("hidden");
+    }
+    function clearBanner() { $("banner").classList.add("hidden"); }
+    function showBuildPanel(msg, { htmlLink } = {}) {
+      const panel = $("buildPanel");
+      panel.classList.remove("hidden");
+      $("buildMsg").innerHTML = msg;
+      const link = $("buildLink");
+      if (htmlLink) {
+        link.classList.remove("hidden");
+        link.innerHTML = htmlLink;
+      } else {
+        link.classList.add("hidden");
+        link.innerHTML = "";
+      }
+    }
+    function hideBuildPanel() { $("buildPanel").classList.add("hidden"); }
+
+    function projectKey(p) { return p.owner + "#" + p.number; }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+        ...opts,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("Request failed (" + res.status + ")"));
+      return data;
+    }
+
+    function setBusy(on) {
+      busy = on;
+      updateButtons();
+      const loginBtn = $("btnLogin");
+      if (loginBtn) loginBtn.disabled = on;
+      $("btnReload").disabled = on;
+      $("repoTrigger").disabled = on || selectedKeys.size === 0;
+    }
+
+    function updateButtons() {
+      const ok = !busy && selectedKeys.size > 0 && selectedRepos.size > 0;
+      $("btnBuild").disabled = !ok;
+      $("btnSave").disabled = !ok;
+    }
+
+    function renderAuth(status) {
+      const row = $("authRow");
+      if (status.authed) {
+        row.innerHTML =
+          '<span class="pill">Signed in as ' + escapeHtml(status.login) + "</span>" +
+          (status.name && status.name !== status.login
+            ? '<span class="muted">' + escapeHtml(status.name) + "</span>" : "");
+      } else {
+        row.innerHTML =
+          '<span class="pill off">Not signed in</span>' +
+          '<button type="button" class="primary" id="btnLogin">Login with GitHub</button>' +
+          '<span class="muted">Opens the same browser flow as <code>gh auth login</code>.</span>';
+        $("btnLogin").onclick = startLogin;
+        if (status.error) showBanner("error", status.error);
+      }
+    }
+
+    function selectedProjects() {
+      return projects.filter((p) => selectedKeys.has(projectKey(p)));
+    }
+
+    function renderProjects(list) {
+      projects = list || [];
+      const box = $("projectsBox");
+      if (!projects.length) {
+        box.innerHTML = '<div class="muted">No Projects found. Check org SSO / <code>read:project</code>, then Reload.</div>';
+        updateButtons();
+        return;
+      }
+      box.innerHTML = projects.map((p) => {
+        const key = projectKey(p);
+        const on = selectedKeys.has(key);
+        return (
+          '<label class="project' + (on ? " selected" : "") + '" data-key="' + escapeHtml(key) + '">' +
+            '<input type="checkbox" ' + (on ? "checked" : "") + " />" +
+            "<div>" +
+              '<div class="title">' + escapeHtml(p.title) + "</div>" +
+              '<div class="meta">' + escapeHtml(p.owner) + " · Project #" + p.number +
+                ' · <a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener">Open on GitHub</a>' +
+              "</div>" +
+            "</div>" +
+          "</label>"
+        );
+      }).join("");
+
+      box.querySelectorAll(".project").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          if (e.target.tagName === "A") return;
+          e.preventDefault();
+          toggleProject(el.dataset.key);
+        });
+      });
+    }
+
+    async function toggleProject(key) {
+      if (selectedKeys.has(key)) selectedKeys.delete(key);
+      else selectedKeys.add(key);
+      renderProjects(projects);
+      maybeAutofillTitle();
+      await loadReposForSelection();
+      updateButtons();
+    }
+
+    function maybeAutofillTitle() {
+      const sel = selectedProjects();
+      if (!$("title").dataset.touched) {
+        if (sel.length === 1) $("title").value = sel[0].title + " — Cycle Time";
+        else if (sel.length > 1) $("title").value = sel.length + " Projects — Cycle Time";
+      }
+    }
+
+    function updateRepoSummary() {
+      const n = selectedRepos.size;
+      if (!n) $("repoSummary").textContent = "Select repositories…";
+      else if (n === 1) $("repoSummary").textContent = [...selectedRepos][0];
+      else $("repoSummary").textContent = n + " repositories selected";
+      $("repoCount").textContent = n + " selected";
+      updateButtons();
+    }
+
+    function renderRepoList() {
+      const q = ($("repoSearch").value || "").trim().toLowerCase();
+      const filtered = availableRepos.filter((r) => {
+        const slug = (r.nameWithOwner || "").toLowerCase();
+        return !q || slug.includes(q) || (r.name || "").toLowerCase().includes(q);
+      });
+      const list = $("repoList");
+      if (reposLoading) {
+        list.innerHTML = '<div class="repo-empty"><span class="spinner"></span>Loading repositories…</div>';
+        return;
+      }
+      if (!selectedKeys.size) {
+        list.innerHTML = '<div class="repo-empty">Select a Project above to load repositories.</div>';
+        return;
+      }
+      if (!filtered.length) {
+        list.innerHTML = '<div class="repo-empty">No repositories match.</div>';
+        return;
+      }
+      list.innerHTML = filtered.map((r) => {
+        const slug = r.nameWithOwner;
+        const on = selectedRepos.has(slug);
+        const icon = r.isFork ? "⑂" : "☰";
+        return (
+          '<button type="button" class="repo-item' + (on ? " selected" : "") + '" data-slug="' + escapeHtml(slug) + '">' +
+            '<span class="check">✓</span>' +
+            '<span class="icon">' + icon + "</span>" +
+            '<span class="name">' + escapeHtml(slug) + "</span>" +
+          "</button>"
+        );
+      }).join("");
+      list.querySelectorAll(".repo-item").forEach((btn) => {
+        btn.onclick = () => {
+          const slug = btn.dataset.slug;
+          if (selectedRepos.has(slug)) selectedRepos.delete(slug);
+          else selectedRepos.add(slug);
+          renderRepoList();
+          updateRepoSummary();
+        };
+      });
+    }
+
+    async function loadReposForSelection() {
+      const owners = [...new Set(selectedProjects().map((p) => p.owner))];
+      $("repoTrigger").disabled = busy || !owners.length;
+      if (!owners.length) {
+        availableRepos = [];
+        selectedRepos.clear();
+        updateRepoSummary();
+        renderRepoList();
+        return;
+      }
+      reposLoading = true;
+      renderRepoList();
+      try {
+        const data = await api("/api/repos?owners=" + encodeURIComponent(owners.join(",")));
+        availableRepos = data.repos || [];
+        // Drop selections that are no longer in the owner set
+        const allowed = new Set(availableRepos.map((r) => r.nameWithOwner));
+        selectedRepos = new Set([...selectedRepos].filter((s) => allowed.has(s)));
+      } catch (e) {
+        availableRepos = [];
+        showBanner("error", e.message);
+      } finally {
+        reposLoading = false;
+        renderRepoList();
+        updateRepoSummary();
+      }
+    }
+
+    function formPayload() {
+      const sel = selectedProjects();
+      if (!sel.length) throw new Error("Select at least one Project");
+      if (!selectedRepos.size) throw new Error("Select at least one repository");
+      return {
+        projects: sel,
+        title: $("title").value.trim(),
+        repos: [...selectedRepos],
+        area: $("area").value.trim() || null,
+      };
+    }
+
+    async function refreshStatus() {
+      const status = await api("/api/status");
+      renderAuth(status);
+      return status;
+    }
+
+    async function loadProjects() {
+      $("projectsBox").innerHTML = '<div class="muted"><span class="spinner"></span>Loading projects…</div>';
+      try {
+        const data = await api("/api/projects");
+        if (data.current) {
+          const cur = data.current;
+          const curProjects = cur.projects && cur.projects.length
+            ? cur.projects
+            : (cur.project ? [cur.project] : []);
+          if (curProjects.length) {
+            selectedKeys = new Set(curProjects.map((p) => p.owner + "#" + p.number));
+          }
+          if (cur.title) {
+            $("title").value = cur.title;
+            $("title").dataset.touched = "1";
+          }
+          if ((cur.repos || []).length) {
+            selectedRepos = new Set(cur.repos);
+          }
+          if (cur.project && cur.project.area) $("area").value = cur.project.area;
+        }
+        renderProjects(data.projects || []);
+        $("projectsHint").textContent =
+          "Found " + (data.projects || []).length + " project(s) for " + (data.login || "you") +
+          ". Select one or more.";
+        await loadReposForSelection();
+      } catch (e) {
+        $("projectsBox").innerHTML = '<div class="muted">' + escapeHtml(e.message) + "</div>";
+        showBanner("error", e.message);
+      }
+      updateButtons();
+    }
+
+    async function startLogin() {
+      clearBanner();
+      showBanner("info", "Complete login in the browser / terminal (gh may show a one-time code)…");
+      setBusy(true);
+      try {
+        await api("/api/login", { method: "POST", body: "{}" });
+        for (let i = 0; i < 120; i++) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const status = await refreshStatus();
+          if (status.authed) {
+            await loadProjects();
+            showBanner("ok", "Signed in. Pick Project(s) below.");
+            return;
+          }
+          const flow = status.loginFlow || {};
+          if (flow.finished && flow.error) throw new Error(flow.error);
+          if (flow.finished && !status.authed) {
+            throw new Error("Login finished but GitHub identity was not detected. Try again.");
+          }
+        }
+        throw new Error("Login timed out. Run `gh auth login` in a terminal, then reload projects.");
+      } catch (e) {
+        showBanner("error", e.message);
+        await refreshStatus();
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function pollBuild() {
+      for (let i = 0; i < 600; i++) {
+        const b = await api("/api/build");
+        const label = b.message || ("Stage: " + (b.stage || "working"));
+        if (b.running) {
+          showBuildPanel('<span class="spinner"></span> ' + escapeHtml(label));
+          showBanner("info", label);
+        }
+        if (b.done) {
+          if (b.error) {
+            showBuildPanel("Build failed.");
+            throw new Error(b.error);
+          }
+          const url = b.boardUrl || "/board";
+          showBuildPanel("Board ready.", {
+            htmlLink:
+              '<a class="pill" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open your board</a>' +
+              ' <span class="muted">or</span> <code>' + escapeHtml(url) + "</code>",
+          });
+          showBanner("ok", "Board ready — click Open your board below.");
+          return url;
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      throw new Error("Build is taking too long. Check the terminal where configure.py is running.");
+    }
+
+    async function save(build) {
+      clearBanner();
+      hideBuildPanel();
+      setBusy(true);
+      showBanner("info", build ? "Starting build…" : "Saving boards.json…");
+      try {
+        if (!build) {
+          const data = await api("/api/save", {
+            method: "POST",
+            body: JSON.stringify(formPayload()),
+          });
+          showBanner("ok", "Saved " + (data.path || "boards.json") + ".");
+          return;
+        }
+        showBuildPanel('<span class="spinner"></span> Starting fetch…');
+        const start = await fetch("/api/save-and-build", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formPayload()),
+        });
+        const startData = await start.json().catch(() => ({}));
+        if (!start.ok && start.status !== 202) {
+          throw new Error(startData.error || ("Request failed (" + start.status + ")"));
+        }
+        await pollBuild();
+      } catch (e) {
+        showBanner("error", e.message);
+        showBuildPanel(escapeHtml(e.message));
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    // Repo menu interactions
+    $("repoTrigger").onclick = () => {
+      if ($("repoTrigger").disabled) return;
+      $("repoMenu").classList.toggle("hidden");
+      if (!$("repoMenu").classList.contains("hidden")) {
+        $("repoSearch").focus();
+        renderRepoList();
+      }
+    };
+    $("repoDone").onclick = () => $("repoMenu").classList.add("hidden");
+    $("repoSearch").oninput = () => renderRepoList();
+    document.addEventListener("click", (e) => {
+      if (!$("repoPicker").contains(e.target)) $("repoMenu").classList.add("hidden");
+    });
+    $("title").addEventListener("input", () => { $("title").dataset.touched = "1"; });
+
+    $("btnSave").onclick = () => save(false);
+    $("btnBuild").onclick = () => save(true);
+    $("btnReload").onclick = async () => {
+      clearBanner();
+      const status = await refreshStatus();
+      if (status.authed) await loadProjects();
+    };
+
+    (async () => {
+      try {
+        const status = await refreshStatus();
+        if (status.authed) await loadProjects();
+        else {
+          $("projectsBox").innerHTML =
+            '<div class="muted">Sign in above to load Projects you can access.</div>';
+        }
+      } catch (e) {
+        showBanner("error", e.message);
+      }
+    })();
+  </script>
+</body>
+</html>

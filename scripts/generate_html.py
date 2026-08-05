@@ -14,7 +14,7 @@ from config import (  # noqa: E402
     DATA_DIR,
     data_path_for,
     load_config,
-    require_project,
+    require_projects,
     require_repos,
     resolve_person,
 )
@@ -40,7 +40,7 @@ def main() -> int:
         raise SystemExit("No boards.json — run: python3 scripts/configure.py")
 
     cfg = load_config(args.boards)
-    project = require_project(cfg)
+    projects = require_projects(cfg)
     repos = require_repos(cfg)
 
     login = None
@@ -69,7 +69,8 @@ def main() -> int:
     data = json.loads(data_path.read_text())
     payload = {
         "title": cfg.get("title") or "Cycle Time Board",
-        "project": project,
+        "project": projects[0],
+        "projects": projects,
         "repos": repos,
         "person": {
             "login": login,

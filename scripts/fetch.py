@@ -17,7 +17,7 @@ from config import (  # noqa: E402
     DATA_DIR,
     data_path_for,
     load_config,
-    require_project,
+    require_projects,
     require_repos,
     resolve_person,
     run_gh_json,
@@ -93,10 +93,16 @@ query($owner: String!, $repo: String!, $number: Int!) {
       updatedAt
       assignees(first: 10) { nodes { login } }
       labels(first: 20) { nodes { name } }
-      projectItems(first: 10) {
+      projectItems(first: 20) {
         nodes {
           updatedAt
-          project { number }
+          project {
+            number
+            owner {
+              ... on Organization { login }
+              ... on User { login }
+            }
+          }
           fieldValues(first: 25) {
             nodes {
               ... on ProjectV2ItemFieldSingleSelectValue {
@@ -160,29 +166,62 @@ query($owner: String!, $repo: String!, $number: Int!) {
 """
 
 
-def project_fields(issue: dict, project_number: int) -> dict:
+def _extract_fields_from_item(pi: dict) -> dict:
     status = sprint = area = None
     status_at = None
-    for pi in issue.get("projectItems", {}).get("nodes", []):
-        if pi.get("project", {}).get("number") != project_number:
+    for fv in pi.get("fieldValues", {}).get("nodes", []):
+        if not fv or "field" not in fv or not fv["field"]:
             continue
-        for fv in pi.get("fieldValues", {}).get("nodes", []):
-            if not fv or "field" not in fv or not fv["field"]:
-                continue
-            name = fv["field"]["name"]
-            if name == "Status" and "name" in fv:
-                status = fv["name"]
-                status_at = fv.get("updatedAt")
-            elif name == "Sprint" and "title" in fv:
-                sprint = fv["title"]
-            elif name == "Area" and "name" in fv:
-                area = fv["name"]
+        name = fv["field"]["name"]
+        if name == "Status" and "name" in fv:
+            status = fv["name"]
+            status_at = fv.get("updatedAt")
+        elif name == "Sprint" and "title" in fv:
+            sprint = fv["title"]
+        elif name == "Area" and "name" in fv:
+            area = fv["name"]
     return {
         "status": status,
         "sprint": sprint,
         "area": area,
         "statusUpdatedAt": status_at,
     }
+
+
+def project_fields(issue: dict, projects: list[dict]) -> dict:
+    """Pick Status/Sprint/Area from the first configured Project that matches."""
+    wanted: dict[tuple[str, int], dict] = {}
+    for p in projects:
+        wanted[(p["owner"].lower(), int(p["number"]))] = p
+
+    fallback = {
+        "status": None,
+        "sprint": None,
+        "area": None,
+        "statusUpdatedAt": None,
+    }
+    for pi in issue.get("projectItems", {}).get("nodes", []):
+        proj = pi.get("project") or {}
+        number = proj.get("number")
+        if number is None:
+            continue
+        owner = ((proj.get("owner") or {}).get("login") or "").lower()
+        key = (owner, int(number))
+        # Prefer owner+number; fall back to number-only if owner missing from API
+        cfg_proj = wanted.get(key)
+        if cfg_proj is None and owner == "":
+            for (o, n), p in wanted.items():
+                if n == int(number):
+                    cfg_proj = p
+                    break
+        if cfg_proj is None:
+            continue
+        fields = _extract_fields_from_item(pi)
+        area_filter = cfg_proj.get("area")
+        if area_filter and fields["area"] and fields["area"] != area_filter:
+            continue
+        return fields
+    return fallback
 
 
 def assigned_at_for(issue: dict, login: str) -> str | None:
@@ -496,7 +535,11 @@ def pick_summary(existing: dict | None, parsed: dict | None) -> dict | None:
     return existing or parsed
 
 
-def load_existing(login: str) -> tuple[dict[int, dict], dict[int, dict]]:
+def _issue_key(repo: str, number: int) -> str:
+    return f"{repo}#{number}"
+
+
+def load_existing(login: str) -> tuple[dict[str, dict], dict[str, dict]]:
     path = DATA_DIR / f"{login}.json"
     if not path.exists():
         return {}, {}
@@ -504,26 +547,30 @@ def load_existing(login: str) -> tuple[dict[int, dict], dict[int, dict]]:
         prev = json.loads(path.read_text())
     except json.JSONDecodeError:
         return {}, {}
-    summaries: dict[int, dict] = {}
-    meta: dict[int, dict] = {}
+    summaries: dict[str, dict] = {}
+    meta: dict[str, dict] = {}
     for issue in prev.get("issues", []):
         n = issue["number"]
+        repo = issue.get("repo") or ""
+        key = _issue_key(repo, n) if repo else str(n)
         summary = issue.get("prSummary")
         if summary and (summary.get("keyChanges") or summary.get("problem")):
-            summaries[n] = summary
-        meta[n] = {
+            summaries[key] = summary
+            if not repo:
+                summaries[str(n)] = summary
+        meta[key] = {
             "todoAt": issue.get("todoAt"),
             "inProgressAt": issue.get("inProgressAt"),
             "cycleHours": issue.get("cycleHours"),
             "prOpenHours": issue.get("prOpenHours"),
         }
+        if not repo:
+            meta[str(n)] = meta[key]
     return summaries, meta
 
 
 def fetch_person(login: str, name: str, cfg: dict) -> dict:
-    project = require_project(cfg)
-    project_number = project["number"]
-    area_filter = project.get("area")
+    projects = require_projects(cfg)
     repos = require_repos(cfg)
     issues_out = []
     existing_summaries, existing_meta = load_existing(login)
@@ -536,15 +583,12 @@ def fetch_person(login: str, name: str, cfg: dict) -> dict:
                 {"owner": owner, "repo": repo_name, "number": hit["number"]},
             )
             issue = data["data"]["repository"]["issue"]
-            fields = project_fields(issue, project_number)
-            if area_filter and fields["area"] and fields["area"] != area_filter:
-                # Keep items with no area set (still on the personal board) if assigned
-                if fields["area"] is not None:
-                    continue
+            fields = project_fields(issue, projects)
 
             status = map_status(fields["status"], issue["state"], issue.get("stateReason"))
             assigned_at = assigned_at_for(issue, login) or issue["createdAt"]
-            prev_meta = existing_meta.get(issue["number"]) or {}
+            key = _issue_key(repo, issue["number"])
+            prev_meta = existing_meta.get(key) or existing_meta.get(str(issue["number"])) or {}
             todo_at = prev_meta.get("todoAt") or assigned_at
             in_progress_at = prev_meta.get("inProgressAt")
             if status == "In Progress" and fields.get("statusUpdatedAt"):
@@ -565,7 +609,7 @@ def fetch_person(login: str, name: str, cfg: dict) -> dict:
                 pr_open = prev_meta.get("prOpenHours")
 
             summary = pick_summary(
-                existing_summaries.get(issue["number"]),
+                existing_summaries.get(key) or existing_summaries.get(str(issue["number"])),
                 summarize_pr(pr, status),
             )
 
@@ -573,6 +617,7 @@ def fetch_person(login: str, name: str, cfg: dict) -> dict:
                 "number": issue["number"],
                 "title": issue["title"],
                 "url": issue["url"],
+                "repo": repo,
                 "status": status,
                 "sprint": fields["sprint"] or "Unassigned",
                 "labels": [l["name"] for l in issue.get("labels", {}).get("nodes", [])],
@@ -640,7 +685,7 @@ def main() -> int:
         return 2
 
     cfg = load_config(args.boards)
-    require_project(cfg)
+    projects = require_projects(cfg)
     require_repos(cfg)
 
     try:
@@ -654,9 +699,11 @@ def main() -> int:
         return 1
 
     login = person["login"]
-    project = cfg["project"]
     print(f"Authenticated board user: {login}", flush=True)
-    print(f"Project: {project['owner']} #{project['number']} — {cfg.get('title')}", flush=True)
+    for p in projects:
+        print(f"Project: {p['owner']} #{p['number']}", flush=True)
+    print(f"Title: {cfg.get('title')}", flush=True)
+    print(f"Repos: {', '.join(cfg.get('repos') or [])}", flush=True)
     print(f"Fetching {login}…", flush=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     try:

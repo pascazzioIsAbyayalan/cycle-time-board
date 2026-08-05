@@ -9,14 +9,14 @@ This package ships **without** a default Project (nothing is pre-pointed at Kuad
 | Step | What happens |
 | ---- | ------------ |
 | 1. Authenticate | GitHub knows who you are (`gh` or `GH_TOKEN`) |
-| 2. **Choose a board** | `configure.py` lists Projects you can access; you pick one + repos |
+| 2. **Choose a board** | `configure.py` opens a **browser UI** to pick a Project + repos |
 | 3. Fetch & build | Scripts pull **your** assigned issues and write HTML / canvas |
 
 Until you run step 2, fetch/generate will stop and tell you to configure.
 
 ```text
-clone  →  gh auth login  →  configure.py  →  fetch.py  →  open dist/index.html
-              (who am I?)     (which board?)   (my issues)
+clone  →  configure.py (browser)  →  Save and build  →  open dist/index.html
+           login + pick Project         fetch + HTML
 ```
 
 ---
@@ -58,73 +58,39 @@ git clone https://github.com/pascazzioIsAbyayalan/cycle-time-board.git
 cd cycle-time-board
 ```
 
-### 2. Authenticate with GitHub
-
-Your username is taken from auth — do **not** put it in a config file.
-
-```bash
-gh auth login
-gh auth status
-```
-
-Or use a classic PAT with `repo`, `read:project`, and `read:org` (if the Project is in a private/SSO org):
-
-```bash
-export GH_TOKEN=ghp_xxxxxxxxxxxxxxxx
-```
-
-For org boards, authorize SSO on the token if GitHub asks.
-
-### 3. Choose your Project board
+### 2. Choose your Project board (browser UI)
 
 ```bash
 python3 scripts/configure.py
 ```
 
-What it does:
+This starts a local page (like `gh auth login`) and opens it in your browser:
 
-1. Signs in as you (`gh api user`)
-2. Lists Projects on **your user** and **your orgs**
-3. Asks you to pick one
-4. Asks which repos to scan for issues assigned to you
-5. Optionally asks for a Project **Area** filter
-6. Writes **`boards.json`** (local only — gitignored)
+1. **Login with GitHub** if needed (same `gh auth login --web` flow; watch the terminal for a one-time code)
+2. **Pick one or more Projects** from your user account and orgs (multi-select)
+3. **Choose repositories** from a searchable dropdown (GitHub-style switcher) for those Project owners
+4. Optional **Area** filter and board title
+5. Click **Save and build board** (writes `boards.json`, runs fetch + generate, opens the HTML)
 
-Example session:
+On the generated board, use the **Repository** filter to switch which of your selected repos you are looking at.
 
-```text
-Signed in as your-login
-Discovering GitHub Projects you can access…
+Leave the terminal running while you use the UI (`Ctrl+C` to stop).
 
-  Checking your-login…
-  Checking my-org…
+| Alternative | Command |
+| ----------- | ------- |
+| Terminal prompts (old flow) | `python3 scripts/configure.py --cli` |
+| UI without auto-opening a tab | `python3 scripts/configure.py --no-browser` then visit the printed URL |
+| Hand-edit config | Copy `boards.example.json` → `boards.json` |
 
-Found 3 project(s):
+Or authenticate ahead of time / via token:
 
-    1. my-org #12 — Platform backlog
-       https://github.com/orgs/my-org/projects/12
-    2. my-org #4 — Team board
-       https://github.com/orgs/my-org/projects/4
-    3. your-login #1 — Personal
-       https://github.com/users/your-login/projects/1
-
-Select a project [1–3]: 2
-Board title [Team board — Cycle Time]:
-Repositories to scan for issues assigned to you (comma-separated owner/name).
-Example: acme/web-app, acme/api
-> my-org/frontend, my-org/api
-Area filter:
-
-Wrote boards.json
-Next:
-  python3 scripts/fetch.py
-  python3 scripts/generate_html.py
-  open dist/index.html
+```bash
+gh auth login
+# or:
+export GH_TOKEN=ghp_xxxxxxxxxxxxxxxx   # needs repo, read:project, read:org (+ SSO if required)
 ```
 
-Prefer hand-editing? Copy `boards.example.json` → `boards.json`.
-
-### 4. Fetch your issues and open the board
+### 3. Refresh later / Cursor canvas
 
 ```bash
 python3 scripts/fetch.py
@@ -139,11 +105,14 @@ open dist/index.html                 # macOS
 
 ## Day-to-day
 
-| Goal | Command |
-| ---- | ------- |
-| Refresh data + HTML | `python3 scripts/fetch.py && python3 scripts/generate_html.py` |
-| Switch to another Project | `python3 scripts/configure.py` (overwrites `boards.json`) |
+| Goal | How |
+| ---- | --- |
+| **Sync from the board** | Keep `python3 scripts/configure.py` running, open [http://127.0.0.1:8765/board](http://127.0.0.1:8765/board), click **Sync with GitHub** (optional **Auto-sync** every 5 minutes) |
+| Refresh via CLI | `python3 scripts/fetch.py && python3 scripts/generate_html.py` |
+| Switch Projects / repos | `python3 scripts/configure.py` (browser UI; overwrites `boards.json`) |
 | Someone else’s assignments | `python3 scripts/fetch.py --person their-login` |
+
+The HTML file itself cannot call GitHub from the browser. Sync works through the local configure server (`/api/refresh`), which uses your `gh` login.
 
 ---
 
@@ -153,22 +122,30 @@ Created by configure (not committed). Example:
 
 ```json
 {
-  "title": "My Team — Cycle Time",
+  "title": "My Teams — Cycle Time",
+  "projects": [
+    {
+      "owner": "my-org",
+      "number": 1,
+      "url": "https://github.com/orgs/my-org/projects/1",
+      "title": "Team board"
+    }
+  ],
   "project": {
-    "owner": "my-org-or-username",
+    "owner": "my-org",
     "number": 1,
-    "url": "https://github.com/orgs/my-org-or-username/projects/1"
+    "url": "https://github.com/orgs/my-org/projects/1"
   },
-  "repos": ["my-org/my-repo"]
+  "repos": ["my-org/my-repo", "my-org/another-repo"]
 }
 ```
 
 | Field | Required | Notes |
 | ----- | -------- | ----- |
-| `project.owner` + `project.number` | Yes | Which GitHub Project |
+| `projects[]` | Yes* | One or more GitHub Projects (`owner` + `number`) |
+| `project` | Legacy | Still written as the first selected Project for older tools |
 | `repos` | Yes | `owner/name` list scanned for **your** assigned issues |
-| `project.area` | No | If set, keep only items with that Project Area |
-| `project.url` | No | Used in the board subtitle link |
+| `projects[].area` / shared area | No | If set, prefer items with that Project Area |
 | `person` | No | Offline fallback only; auth wins by default |
 
 ---
@@ -196,7 +173,8 @@ In chat (with `gh` working in the terminal):
 
 | Command | Purpose |
 | ------- | ------- |
-| `python3 scripts/configure.py` | Pick a Project → write `boards.json` |
+| `python3 scripts/configure.py` | Open browser UI → pick Project → write `boards.json` (optional build) |
+| `python3 scripts/configure.py --cli` | Same setup via terminal prompts |
 | `python3 scripts/fetch.py` | Fetch your issues → `data/people/<login>.json` |
 | `python3 scripts/generate_html.py` | Build `dist/index.html` |
 | `python3 scripts/generate_canvas.py` | Build `dist/cycle-time-board.canvas.tsx` |

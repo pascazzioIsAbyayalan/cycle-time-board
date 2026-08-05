@@ -619,7 +619,7 @@ export default function UITouchGrassBoard() {
                           <StatusBadge status={issue.status} />
                         </Row>
                       }>
-                        #{issue.number}
+                        <Link href={issue.url}>#{issue.number}</Link>
                       </CardHeader>
                       <CardBody>
                         <Stack gap={10}>
@@ -682,7 +682,7 @@ export default function UITouchGrassBoard() {
                           <StatusBadge status={issue.status} />
                         </Row>
                       }>
-                        #{issue.number}
+                        <Link href={issue.url}>#{issue.number}</Link>
                       </CardHeader>
                       <CardBody>
                         <Stack gap={10}>

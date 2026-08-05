@@ -1,12 +1,13 @@
 {
   "login": "pascazzioIsAbyayalan",
   "name": "Grettel Pascacio",
-  "fetchedAt": "2026-08-05T14:28:35Z",
+  "fetchedAt": "2026-08-05T16:55:13Z",
   "issues": [
     {
       "number": 625,
       "title": "Fix hardcoded user-facing strings across policy and resource action hooks",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/625",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "In Progress",
       "sprint": "Sprint 38",
       "labels": [
@@ -25,6 +26,7 @@
       "number": 664,
       "title": "docs: create CI.md to document e2e pipeline design and decisions",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/664",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Todo",
       "sprint": "Sprint 38",
       "labels": [
@@ -43,6 +45,7 @@
       "number": 651,
       "title": "Migrate to @openshift-console/dynamic-plugin-sdk 4.22.0",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/651",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Todo",
       "sprint": "Sprint 38",
       "labels": [
@@ -54,24 +57,32 @@
       "assignedAt": "2026-07-15T10:55:08Z",
       "todoAt": "2026-07-15T15:45:47Z",
       "inProgressAt": null,
-      "cycleHours": 482.9,
-      "prOpenHours": 0.3,
+      "cycleHours": 509.2,
+      "prOpenHours": 0.4,
       "prSummary": {
-        "prType": "Pull Request",
+        "prType": "Chore",
         "problem": "",
-        "solution": "Release v0.6.0",
-        "keyChanges": []
+        "solution": "Bumps react-i18next from ^11.7.3 to ~16.5.8 to align with what OCP 4.22 console provides. Lands ahead of the SDK 4.22 bump (#651).",
+        "keyChanges": [
+          "react-i18next pinned to ~16.5.8 (tilde matches OCP 4.22 exactly)",
+          "TFunction import moved from react-i18next to i18next (v16 dropped the re-export)",
+          "transpileOnly: true added to ts-loader \u2014 react-i18next 16 augments React.HTMLAttributes.children, widening the type and causing spurious PatternFly prop check failures",
+          "diagnostics: false added to ts-jest for the same reason",
+          "validateSharedModules: false on ConsoleRemotePlugin \u2014 SDK 1.x still declares ^11 but OCP 4.22 provides ~16.5.8",
+          "All three workarounds are transitional and should be removed after the SDK 4.22 bump (#651)."
+        ]
       },
-      "prNumber": 706,
-      "prTitle": "v0.6.0",
-      "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/706",
-      "prCreatedAt": "2026-08-04T13:30:42Z",
-      "mergedAt": "2026-08-04T13:49:37Z"
+      "prNumber": 714,
+      "prTitle": "chore: bump react-i18next to ~16.5.8",
+      "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/714",
+      "prCreatedAt": "2026-08-05T15:42:31Z",
+      "mergedAt": "2026-08-05T16:06:58Z"
     },
     {
       "number": 637,
       "title": "Upgrade to React 18",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/637",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Todo",
       "sprint": "Sprint 38",
       "labels": [
@@ -90,6 +101,7 @@
       "number": 468,
       "title": "DNSPolicy ProviderRefs Empty String Bypass",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/468",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Todo",
       "sprint": "Unassigned",
       "labels": [
@@ -105,9 +117,28 @@
       "prSummary": null
     },
     {
+      "number": 317,
+      "title": "Typo own tier selection dropbox",
+      "url": "https://github.com/Kuadrant/kuadrant-backstage-plugin/issues/317",
+      "repo": "Kuadrant/kuadrant-backstage-plugin",
+      "status": "Todo",
+      "sprint": "Unassigned",
+      "labels": [
+        "bug",
+        "triage/accepted"
+      ],
+      "assignedAt": "2026-07-29T10:33:30Z",
+      "todoAt": "2026-07-29T10:33:30Z",
+      "inProgressAt": null,
+      "cycleHours": null,
+      "prOpenHours": null,
+      "prSummary": null
+    },
+    {
       "number": 614,
       "title": "API Product deletion type to confirm missing when deleting from details",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/614",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Done",
       "sprint": "Sprint 37",
       "labels": [
@@ -122,14 +153,15 @@
       "cycleHours": 334.0,
       "prOpenHours": 18.6,
       "prSummary": {
-        "prType": "Bug Fix",
-        "problem": "APIProduct detail page Actions dropdown used the SDK's built-in useDeleteModal (simple checkbox confirmation), while the list page kebab already used the custom type-to-confirm APIProductDeleteModal \u2014 inconsistent delete UX across views.",
-        "solution": "Replaced useDeleteModal with the SDK's useModal hook to launch APIProductDeleteModal from the Actions dropdown, matching PatternFly's 'Confirm a destructive action' guidelines. Detail page now navigates back to the APIProducts list after successful deletion.",
+        "prType": "Bug fix",
+        "problem": "APIProduct detail page Actions dropdown used the SDK's built-in useDeleteModal for deletion, which shows a simple \"Are you sure?\" checkbox confirmation. The list page kebab menu already uses the custom type-to-confirm APIProductDeleteModal (enhanced in PR #609), creating an inconsistent delete experience across the two views.",
+        "solution": "Replaced useDeleteModal with the SDK's useModal hook to launch APIProductDeleteModal from the Actions dropdown, matching PatternFly design guidelines for \"Confirm a destructive action\". Detail page now navigates back to the APIProducts list after successful deletion.",
         "keyChanges": [
-          "Added optional onDeleteSuccess callback to APIProductDeleteModal so detail page can navigate away on success",
-          "Moved setIsDeleting cleanup out of finally into catch only \u2014 avoids setState-on-unmount warnings",
-          "Switched useAPIProductActions from useDeleteModal to useModal with APIProductDeleteModalWrapper",
-          "Updated e2e delete flow to type the resource name into #confirm-delete instead of checking a checkbox"
+          "onDeleteSuccess callback: Added optional prop to APIProductDeleteModal to distinguish successful deletion from cancel \u2014 detail page navigates away, list page behaviour unchanged",
+          "setIsDeleting cleanup: Moved out of finally block and into catch only, preventing React setState-on-unmount warnings when the modal is closed after deletion",
+          "Replaced useDeleteModal with useModal: Switched from the SDK's built-in delete confirmation to the generic modal launcher in useAPIProductActions",
+          "APIProductDeleteModalWrapper: Added wrapper component that bridges the Console ModalProvider API (closeModal prop) with APIProductDeleteModal, handling post-delete navigation to /kuadrant/apiproducts/ns/{namespace}",
+          "Updated delete confirmation flow: Test now types the resource name into #confirm-delete input instead of checking a checkbox, matching the new type-to-confirm behaviour"
         ]
       },
       "prNumber": 676,
@@ -142,6 +174,7 @@
       "number": 590,
       "title": "Details pages content heavily left-aligned",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/590",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Done",
       "sprint": "Sprint 37",
       "labels": [
@@ -173,6 +206,7 @@
       "number": 583,
       "title": "Add GatewayClass filtering for gateway tables",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/583",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Done",
       "sprint": "Sprint 38",
       "labels": [
@@ -186,14 +220,18 @@
       "cycleHours": 503.8,
       "prOpenHours": 23.0,
       "prSummary": {
-        "prType": "Feature",
-        "problem": "Gateway tables showed all gateways including irrelevant types (e.g. waypoint gateways with gatewayClassName 'istio-waypoint'). Only Name, Namespace, and Type filters existed \u2014 no GatewayClass filter.",
-        "solution": "Extended ResourceList with a reusable additionalFilters prop (PatternFly dropdown select), then wired a GatewayClass filter on the Overview 'Gateways - Traffic Analysis' card, populated dynamically from cluster GatewayClass resources.",
+        "prType": "New feature",
+        "problem": "Gateway tables displayed all gateways including irrelevant types like waypoint gateways (gatewayClassName: 'istio-waypoint'), adding noise to the UI. No filtering by GatewayClass existed \u2014 only Name, Namespace, and Type (resource kind) were available.",
+        "solution": "Extended ResourceList with a generic additionalFilters prop following PatternFly dropdown select patterns, keeping the component reusable for future filter needs. Wired up a GatewayClass dropdown filter in the \"Gateways - Traffic Analysis\" card on the Overview page, populated dynamically from cluster GatewayClass resources.",
         "keyChanges": [
-          "Added AdditionalFilter type and optional additionalFilters prop to ResourceList (default [])",
-          "When an additional filter is active, toolbar text input switches to a Select dropdown with an All option",
-          "Extended Gateway interface with spec.gatewayClassName; watch GatewayClass resources for dropdown options",
-          "Passed GatewayClass filter into Overview gateway ResourceList comparing spec.gatewayClassName"
+          "AdditionalFilter type: Defines a custom filter shape with label, options, and filterFn \u2014 fully decoupled from any specific resource",
+          "additionalFilters prop: Optional array defaulting to [], so all existing ResourceList callers are unaffected",
+          "Conditional toolbar rendering: When an additional filter is selected, the text input is replaced with a Select dropdown of available values plus an \"All\" default",
+          "Filter logic branching: The useEffect checks whether the active filter is an additional filter and uses its filterFn, otherwise the existing Name/Namespace/Type text matching runs unchanged",
+          "Gateway interface extended: Added spec.gatewayClassName for type-safe access during filtering",
+          "GatewayClass resource watch: Fetches all GatewayClass resources from the cluster using the existing RESOURCES.GatewayClass.gvk definition",
+          "gatewayClassNames memo: Extracts names from watched GatewayClasses into a string array for the dropdown options",
+          "additionalFilters prop: Passed to the Gateway ResourceList with a single \"GatewayClass\" filter that compares spec.gatewayClassName against the selected value"
         ]
       },
       "prNumber": 698,
@@ -206,6 +244,7 @@
       "number": 572,
       "title": "API Product deletion type to confirm UI enhancement",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/572",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Done",
       "sprint": "Sprint 37",
       "labels": [
@@ -220,16 +259,14 @@
       "cycleHours": 167.9,
       "prOpenHours": 17.9,
       "prSummary": {
-        "prType": "Style / Formatting",
-        "problem": "API Product and API Key deletion modals had inconsistent UI/UX \u2014 different sizes, layouts, and confirmation patterns between the two flows.",
-        "solution": "Used the API Key modal as a consistent base and redesigned both modals to follow PatternFly's 'Confirm a destructive action' guidelines, unifying the experience across both resource types.",
+        "prType": "Code style changes",
+        "problem": "API Product and API Key Modals had an inconsistent UI and UX could be improved. API Key Modal used as a base design, improved the basic layout to match Patternfly design guidelines to \"Confirm a destructive action\".",
+        "solution": "Form adjusted and enhanced lifecycle management. API Product Modal matches API Key Modal.",
         "keyChanges": [
-          "Modal size reduced from medium \u2192 small for a more focused feel",
-          "Added warning icon and simplified messaging to a single line",
-          "Improved placeholder text: 'Enter API Product name' for better guidance",
-          "Simplified confirm button label from 'Delete API Product' \u2192 'Delete'",
-          "Added useEffect hook to reliably reset the confirmation field on all close methods (Cancel, ESC, click-outside)",
-          "Reorganised imports to match project conventions; added kuadrant.css import"
+          "Simplified FormGroup",
+          "Improved placeholder: Changed to \"Enter API Product name\"",
+          "for better guidance",
+          "Added input type: Explicitly set type=\"text\" on TextInput"
         ]
       },
       "prNumber": 609,
@@ -242,6 +279,7 @@
       "number": 571,
       "title": "Cancel button navigates to resource list instead of previous page",
       "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/571",
+      "repo": "Kuadrant/kuadrant-console-plugin",
       "status": "Closed",
       "sprint": "Sprint 37",
       "labels": [

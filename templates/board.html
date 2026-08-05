@@ -56,7 +56,19 @@
     .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
     .header .sub { margin: 4px 0 0; font-size: 13px; color: var(--grey); }
     .header .sub a { color: var(--grey); }
-    .header-actions { margin-left: auto; display: flex; gap: 8px; }
+    .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .sync-auto {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--grey); cursor: pointer; user-select: none;
+    }
+    .sync-auto input { accent-color: var(--mint-deep); }
+    .sync-status {
+      margin: 0 0 12px; padding: 8px 12px; border-radius: 8px;
+      font-size: 12px; background: var(--lavender); color: var(--charcoal);
+    }
+    .sync-status.error { background: #fff7ed; color: #b45309; }
+    .sync-status.ok { background: var(--mint); }
+    #syncBtn.busy { opacity: 0.7; cursor: wait; }
     button, select, input[type="text"], input[type="search"] {
       font: inherit; color: var(--charcoal);
       background: var(--surface);
@@ -171,7 +183,11 @@
     .card.done { border-left-color: var(--mint-deep); background: color-mix(in srgb, var(--mint-deep) 14%, transparent); }
     .card.closed { border-left-color: var(--grey); background: color-mix(in srgb, var(--grey) 12%, transparent); opacity: 0.95; }
     .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .card-head .num { font-family: ui-monospace, monospace; font-size: 12px; color: var(--grey); font-weight: 600; }
+    .card-head .num, a.num {
+      font-family: ui-monospace, monospace; font-size: 12px; color: var(--grey); font-weight: 600;
+      text-decoration: none;
+    }
+    a.num:hover { color: var(--lavender-deep); text-decoration: underline; }
     .spacer { flex: 1; }
     .badge {
       font-size: 10px; padding: 2px 7px; border-radius: 3px; white-space: nowrap;
@@ -288,9 +304,16 @@
         <p class="sub" id="subtitle"></p>
       </div>
       <div class="header-actions">
+        <label id="autoSyncWrap" class="sync-auto hidden" title="Re-fetch from GitHub on an interval while this page stays open">
+          <input type="checkbox" id="autoSync" /> Auto-sync
+        </label>
+        <button type="button" id="syncBtn" class="btn-primary" disabled title="Requires local configure server (python3 scripts/configure.py)">
+          Sync with GitHub
+        </button>
         <button type="button" id="themeToggle" class="btn-primary">Dark mode</button>
       </div>
     </header>
+    <p id="syncStatus" class="sync-status hidden" aria-live="polite"></p>
 
     <section class="stats" id="stats"></section>
     <hr />
@@ -339,6 +362,10 @@
           <span class="lbl">Sprint</span>
           <select id="filterSprint"><option value="">All sprints</option></select>
         </label>
+        <label>
+          <span class="lbl">Repository</span>
+          <select id="filterRepo"><option value="">All repositories</option></select>
+        </label>
       </div>
       <div class="chips" id="chips"></div>
     </section>
@@ -374,6 +401,13 @@
         .replace(/&/g, "&amp;").replace(/</g, "&lt;")
         .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
+    function issueRepo(issue) {
+      if (issue.repo) return issue.repo;
+      const m = String(issue.url || "").match(/github\.com\/([^/]+\/[^/]+)\//);
+      return m ? m[1] : "";
+    }
+    // Normalize legacy snapshots without repo field
+    ISSUES.forEach(i => { if (!i.repo) i.repo = issueRepo(i); });
     function badgeClass(status) {
       if (status === "In Progress") return "ip";
       if (status === "Ready for Review") return "review";
@@ -493,10 +527,11 @@
       if (pieHover) setPieHover(pieHover);
     }
 
-    function renderLabelSection() {
+    function renderLabelSection(sourceIssues) {
+      const list = sourceIssues || ISSUES;
       const cat = {};
       const labelCounts = {};
-      ISSUES.forEach(i => {
+      list.forEach(i => {
         const c = primaryCategory(i);
         cat[c] = (cat[c] || 0) + 1;
         (i.labels || []).forEach(l => { labelCounts[l] = (labelCounts[l] || 0) + 1; });
@@ -512,6 +547,7 @@
       const q = document.getElementById("search").value.trim().toLowerCase();
       const label = document.getElementById("filterLabel").value;
       const sprint = document.getElementById("filterSprint").value;
+      const repo = document.getElementById("filterRepo").value;
       const date = document.getElementById("filterDate").value;
       const now = Date.now();
       const day = 86400000;
@@ -519,6 +555,7 @@
         if (q && !issue.title.toLowerCase().includes(q) && !String(issue.number).includes(q)) return false;
         if (label && !(issue.labels || []).includes(label)) return false;
         if (sprint && issue.sprint !== sprint) return false;
+        if (repo && issueRepo(issue) !== repo) return false;
         if (date !== "all") {
           const ms = new Date(issue.todoAt || issue.assignedAt).getTime();
           if (date === "thisweek" && ms < now - 7 * day) return false;
@@ -620,7 +657,7 @@
           const openH = (Date.now() - new Date(issue.assignedAt).getTime()) / 3600000;
           return `<article class="card ${cardClass(issue.status)}">
             <div class="card-head">
-              <span class="num">#${issue.number}</span>
+              <a class="num" href="${escapeHtml(issue.url)}" target="_blank" rel="noopener">#${issue.number}</a>
               <span class="spacer"></span>
               <span style="font-size:11px;color:var(--grey)">Open: <strong>${fmtHours(openH)}</strong></span>
               <span class="badge ${badgeClass(issue.status)}">${issue.status}</span>
@@ -651,7 +688,7 @@
             : null;
           return `<article class="card ${cardClass(issue.status)}">
             <div class="card-head">
-              <span class="num">#${issue.number}</span>
+              <a class="num" href="${escapeHtml(issue.url)}" target="_blank" rel="noopener">#${issue.number}</a>
               <span class="spacer"></span>
               <span style="font-size:11px;color:var(--grey)">Total: <strong>${fmtHours(issue.cycleHours)}</strong></span>
               <span class="badge ${badgeClass(issue.status)}">${issue.status}</span>
@@ -728,12 +765,14 @@
       const search = document.getElementById("search").value.trim();
       const label = document.getElementById("filterLabel").value;
       const sprint = document.getElementById("filterSprint").value;
+      const repo = document.getElementById("filterRepo").value;
       const date = document.getElementById("filterDate").value;
-      const has = search || label || sprint || date !== "all";
+      const has = search || label || sprint || repo || date !== "all";
       let html = `<span>${filtered.length === ISSUES.length ? `${ISSUES.length} issues` : `${filtered.length} of ${ISSUES.length} issues`}</span>`;
       if (search) html += `<span class="chip-x" style="background:var(--lavender)">"${escapeHtml(search)}" <button data-clear="search">✕</button></span>`;
       if (label) html += `<span class="chip-x" style="background:var(--mint)">${escapeHtml(label)} <button data-clear="label">✕</button></span>`;
       if (sprint) html += `<span class="chip-x" style="background:var(--blush)">${escapeHtml(sprint)} <button data-clear="sprint">✕</button></span>`;
+      if (repo) html += `<span class="chip-x" style="background:var(--lavender)">${escapeHtml(repo)} <button data-clear="repo">✕</button></span>`;
       if (date !== "all") html += `<span class="chip-x" style="background:var(--amber-soft);color:var(--amber-text)">${date === "thisweek" ? "This week" : date === "last2weeks" ? "Last 2 weeks" : "Older"} <button data-clear="date">✕</button></span>`;
       if (has) html += `<button type="button" id="clearAll" style="all:unset;cursor:pointer;font-size:11px;color:var(--grey);text-decoration:underline">Clear all</button>`;
       document.getElementById("chips").innerHTML = html;
@@ -741,24 +780,34 @@
 
     function render() {
       const filtered = filteredIssues();
-      const resolved = ISSUES.filter(i => i.status === "Done" || i.status === "Closed");
-      const done = ISSUES.filter(i => i.status === "Done");
+      const resolved = filtered.filter(i => i.status === "Done" || i.status === "Closed");
+      const done = filtered.filter(i => i.status === "Done");
       const avgCycle = resolved.length ? resolved.reduce((s, i) => s + (i.cycleHours || 0), 0) / resolved.length : null;
       const avgPR = done.length ? done.reduce((s, i) => s + (i.prOpenHours || 0), 0) / done.length : null;
 
       document.getElementById("title").textContent = BOARD.title;
       document.title = BOARD.title;
-      const repos = (BOARD.repos || []).join(", ") || BOARD.project.owner;
+      const projects = (BOARD.projects && BOARD.projects.length)
+        ? BOARD.projects
+        : (BOARD.project ? [BOARD.project] : []);
+      const projectLinks = projects.map(p =>
+        `<a href="${escapeHtml(p.url || "#")}" target="_blank" rel="noopener">${escapeHtml(p.owner)} #${p.number}</a>`
+      ).join(" · ");
+      const repoCount = (BOARD.repos || []).length;
+      const repoHint = repoCount
+        ? `${repoCount} repo${repoCount === 1 ? "" : "s"}`
+        : "repos";
       document.getElementById("subtitle").innerHTML =
-        `${repos} · <a href="${BOARD.project.url}" target="_blank" rel="noopener">Project #${BOARD.project.number}</a> · Last fetched ${fmtDate(BOARD.fetchedAt)}`;
+        `${repoHint}${projectLinks ? " · " + projectLinks : ""} · Last fetched ${fmtDate(BOARD.fetchedAt)}`;
 
       document.getElementById("stats").innerHTML = [
-        [ISSUES.length, "Issues assigned"],
+        [filtered.length, filtered.length === ISSUES.length ? "Issues assigned" : "Issues (filtered)"],
         [resolved.length, "Resolved"],
         [fmtHours(avgCycle), "Avg assigned → resolved"],
         [done.length ? fmtHours(avgPR) : "—", "Avg PR open → merged"],
       ].map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
 
+      renderLabelSection(filtered);
       renderChips(filtered);
       const main = document.getElementById("main");
       if (!filtered.length) main.innerHTML = emptyState();
@@ -774,6 +823,7 @@
       document.getElementById("search").value = "";
       document.getElementById("filterLabel").value = "";
       document.getElementById("filterSprint").value = "";
+      document.getElementById("filterRepo").value = "";
       document.getElementById("filterDate").value = "all";
       render();
     }
@@ -805,6 +855,7 @@
           if (k === "search") document.getElementById("search").value = "";
           if (k === "label") document.getElementById("filterLabel").value = "";
           if (k === "sprint") document.getElementById("filterSprint").value = "";
+          if (k === "repo") document.getElementById("filterRepo").value = "";
           if (k === "date") document.getElementById("filterDate").value = "all";
           render();
         };
@@ -816,17 +867,23 @@
     function initFilters() {
       const labels = [...new Set(ISSUES.flatMap(i => i.labels || []))].sort();
       const sprints = [...new Set(ISSUES.map(i => i.sprint).filter(Boolean))].sort();
+      const repos = [...new Set([
+        ...(BOARD.repos || []),
+        ...ISSUES.map(i => issueRepo(i)).filter(Boolean),
+      ])].sort();
       document.getElementById("filterLabel").innerHTML =
         `<option value="">All labels</option>` + labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join("");
       document.getElementById("filterSprint").innerHTML =
         `<option value="">All sprints</option>` + sprints.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+      document.getElementById("filterRepo").innerHTML =
+        `<option value="">All repositories</option>` + repos.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
     }
 
     document.getElementById("themeToggle").onclick = () => {
       setTheme(getTheme() === "light" ? "dark" : "light");
-      renderLabelSection();
+      renderLabelSection(filteredIssues());
     };
-    ["search", "filterLabel", "filterSprint", "filterDate"].forEach(id => {
+    ["search", "filterLabel", "filterSprint", "filterRepo", "filterDate"].forEach(id => {
       document.getElementById(id).addEventListener(id === "search" ? "input" : "change", render);
     });
     document.querySelectorAll(".pill").forEach(p => p.addEventListener("click", () => {
@@ -835,10 +892,141 @@
       render();
     }));
 
+    // ── GitHub sync (via local configure server) ─────────────────────
+    const SYNC_CANDIDATES = [
+      (typeof location !== "undefined" && location.protocol.startsWith("http")
+        ? location.origin : null),
+      "http://127.0.0.1:8765",
+      "http://localhost:8765",
+    ].filter(Boolean);
+    let syncBase = null;
+    let syncBusy = false;
+    let autoSyncTimer = null;
+    const AUTO_SYNC_MS = 5 * 60 * 1000;
+
+    function setSyncStatus(kind, text) {
+      const el = document.getElementById("syncStatus");
+      if (!text) {
+        el.className = "sync-status hidden";
+        el.textContent = "";
+        return;
+      }
+      el.className = "sync-status" + (kind ? " " + kind : "");
+      el.textContent = text;
+    }
+
+    async function probeSyncServer() {
+      for (const base of SYNC_CANDIDATES) {
+        try {
+          const res = await fetch(base + "/api/status", { cache: "no-store" });
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (typeof data.authed === "boolean") {
+            syncBase = base;
+            const btn = document.getElementById("syncBtn");
+            btn.disabled = false;
+            btn.title = data.authed
+              ? "Fetch latest issues from GitHub and refresh this board"
+              : "Configure server is up, but GitHub auth is missing (gh auth login)";
+            document.getElementById("autoSyncWrap").classList.remove("hidden");
+            if (localStorage.getItem("ctb-auto-sync") === "1") {
+              document.getElementById("autoSync").checked = true;
+              startAutoSync();
+            }
+            return true;
+          }
+        } catch (_) { /* try next */ }
+      }
+      syncBase = null;
+      document.getElementById("syncBtn").disabled = true;
+      document.getElementById("syncBtn").title =
+        "Start the local server first: python3 scripts/configure.py — then open http://127.0.0.1:8765/board";
+      document.getElementById("autoSyncWrap").classList.add("hidden");
+      return false;
+    }
+
+    async function pollSync() {
+      for (let i = 0; i < 600; i++) {
+        const res = await fetch(syncBase + "/api/build", { cache: "no-store" });
+        const b = await res.json();
+        if (b.running) {
+          setSyncStatus("", b.message || "Syncing with GitHub…");
+        }
+        if (b.done) {
+          if (b.error) throw new Error(b.error);
+          setSyncStatus("ok", "Synced. Reloading…");
+          // Prefer board URL from server when we are not already on /board
+          const next = b.boardUrl || (syncBase + "/board");
+          if (location.href.startsWith("http") && location.pathname.endsWith("/board")) {
+            location.reload();
+          } else {
+            location.href = next + "?t=" + Date.now();
+          }
+          return;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      throw new Error("Sync timed out. Check the terminal running configure.py.");
+    }
+
+    async function syncWithGitHub() {
+      if (syncBusy) return;
+      if (!syncBase && !(await probeSyncServer())) {
+        setSyncStatus(
+          "error",
+          "Local sync server not running. In a terminal: python3 scripts/configure.py — then open the board at http://127.0.0.1:8765/board"
+        );
+        return;
+      }
+      syncBusy = true;
+      const btn = document.getElementById("syncBtn");
+      btn.disabled = true;
+      btn.classList.add("busy");
+      btn.textContent = "Syncing…";
+      setSyncStatus("", "Starting sync with GitHub…");
+      try {
+        const start = await fetch(syncBase + "/api/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        const data = await start.json().catch(() => ({}));
+        if (!start.ok && start.status !== 202) {
+          throw new Error(data.error || ("Sync failed (" + start.status + ")"));
+        }
+        await pollSync();
+      } catch (e) {
+        setSyncStatus("error", e.message || String(e));
+        btn.disabled = false;
+        btn.classList.remove("busy");
+        btn.textContent = "Sync with GitHub";
+        syncBusy = false;
+      }
+    }
+
+    function startAutoSync() {
+      stopAutoSync();
+      autoSyncTimer = setInterval(() => {
+        if (!document.hidden && !syncBusy) syncWithGitHub();
+      }, AUTO_SYNC_MS);
+    }
+    function stopAutoSync() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      autoSyncTimer = null;
+    }
+
+    document.getElementById("syncBtn").onclick = () => syncWithGitHub();
+    document.getElementById("autoSync").onchange = (e) => {
+      localStorage.setItem("ctb-auto-sync", e.target.checked ? "1" : "0");
+      if (e.target.checked) startAutoSync();
+      else stopAutoSync();
+    };
+
     setTheme(getTheme());
     initFilters();
     renderLabelSection();
     render();
+    probeSyncServer();
   </script>
 </body>
 </html>

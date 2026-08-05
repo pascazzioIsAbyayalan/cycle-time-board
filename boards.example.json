@@ -1,10 +1,18 @@
 {
-  "title": "My Team — Cycle Time",
+  "title": "My Teams — Cycle Time",
+  "projects": [
+    {
+      "owner": "my-org",
+      "number": 1,
+      "url": "https://github.com/orgs/my-org/projects/1",
+      "title": "Team board"
+    }
+  ],
   "project": {
-    "owner": "my-org-or-username",
+    "owner": "my-org",
     "number": 1,
-    "url": "https://github.com/orgs/my-org-or-username/projects/1",
-    "area": null
+    "url": "https://github.com/orgs/my-org/projects/1",
+    "title": "Team board"
   },
-  "repos": ["my-org/my-repo"]
+  "repos": ["my-org/my-repo", "my-org/another-repo"]
 }

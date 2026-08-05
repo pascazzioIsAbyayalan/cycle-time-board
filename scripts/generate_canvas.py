@@ -14,7 +14,7 @@ from config import (  # noqa: E402
     DATA_DIR,
     data_path_for,
     load_config,
-    require_project,
+    require_projects,
     require_repos,
     resolve_person,
 )
@@ -40,7 +40,8 @@ def main() -> int:
         raise SystemExit("No boards.json — run: python3 scripts/configure.py")
 
     cfg = load_config(args.boards)
-    project = require_project(cfg)
+    projects = require_projects(cfg)
+    project = projects[0]
     repos = require_repos(cfg)
 
     login = None

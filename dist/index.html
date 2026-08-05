@@ -56,7 +56,19 @@
     .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
     .header .sub { margin: 4px 0 0; font-size: 13px; color: var(--grey); }
     .header .sub a { color: var(--grey); }
-    .header-actions { margin-left: auto; display: flex; gap: 8px; }
+    .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .sync-auto {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--grey); cursor: pointer; user-select: none;
+    }
+    .sync-auto input { accent-color: var(--mint-deep); }
+    .sync-status {
+      margin: 0 0 12px; padding: 8px 12px; border-radius: 8px;
+      font-size: 12px; background: var(--lavender); color: var(--charcoal);
+    }
+    .sync-status.error { background: #fff7ed; color: #b45309; }
+    .sync-status.ok { background: var(--mint); }
+    #syncBtn.busy { opacity: 0.7; cursor: wait; }
     button, select, input[type="text"], input[type="search"] {
       font: inherit; color: var(--charcoal);
       background: var(--surface);
@@ -171,7 +183,11 @@
     .card.done { border-left-color: var(--mint-deep); background: color-mix(in srgb, var(--mint-deep) 14%, transparent); }
     .card.closed { border-left-color: var(--grey); background: color-mix(in srgb, var(--grey) 12%, transparent); opacity: 0.95; }
     .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .card-head .num { font-family: ui-monospace, monospace; font-size: 12px; color: var(--grey); font-weight: 600; }
+    .card-head .num, a.num {
+      font-family: ui-monospace, monospace; font-size: 12px; color: var(--grey); font-weight: 600;
+      text-decoration: none;
+    }
+    a.num:hover { color: var(--lavender-deep); text-decoration: underline; }
     .spacer { flex: 1; }
     .badge {
       font-size: 10px; padding: 2px 7px; border-radius: 3px; white-space: nowrap;
@@ -288,9 +304,16 @@
         <p class="sub" id="subtitle"></p>
       </div>
       <div class="header-actions">
+        <label id="autoSyncWrap" class="sync-auto hidden" title="Re-fetch from GitHub on an interval while this page stays open">
+          <input type="checkbox" id="autoSync" /> Auto-sync
+        </label>
+        <button type="button" id="syncBtn" class="btn-primary" disabled title="Requires local configure server (python3 scripts/configure.py)">
+          Sync with GitHub
+        </button>
         <button type="button" id="themeToggle" class="btn-primary">Dark mode</button>
       </div>
     </header>
+    <p id="syncStatus" class="sync-status hidden" aria-live="polite"></p>
 
     <section class="stats" id="stats"></section>
     <hr />
@@ -339,6 +362,10 @@
           <span class="lbl">Sprint</span>
           <select id="filterSprint"><option value="">All sprints</option></select>
         </label>
+        <label>
+          <span class="lbl">Repository</span>
+          <select id="filterRepo"><option value="">All repositories</option></select>
+        </label>
       </div>
       <div class="chips" id="chips"></div>
     </section>
@@ -354,7 +381,7 @@
   </div>
 
   <script>
-    const BOARD = {"title": "Example \u2014 Cycle Time", "project": {"owner": "example-org", "number": 1, "url": "https://github.com/orgs/example-org/projects/1"}, "repos": ["example-org/example-repo"], "person": {"login": "pascazzioIsAbyayalan", "name": "Grettel Pascacio"}, "fetchedAt": "2026-08-05T14:28:35Z", "issues": [{"number": 625, "title": "Fix hardcoded user-facing strings across policy and resource action hooks", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/625", "status": "In Progress", "sprint": "Sprint 38", "labels": ["enhancement", "good first issue", "triage/accepted"], "assignedAt": "2026-07-13T08:30:40Z", "todoAt": "2026-07-13T08:30:40Z", "inProgressAt": "2026-07-29T15:25:18Z", "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 664, "title": "docs: create CI.md to document e2e pipeline design and decisions", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/664", "status": "Todo", "sprint": "Sprint 38", "labels": ["documentation", "good first issue", "triage/accepted"], "assignedAt": "2026-07-22T10:22:56Z", "todoAt": "2026-07-22T10:22:56Z", "inProgressAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 651, "title": "Migrate to @openshift-console/dynamic-plugin-sdk 4.22.0", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/651", "status": "Todo", "sprint": "Sprint 38", "labels": ["dependencies", "epic", "triage/accepted", "sdk-maintenance"], "assignedAt": "2026-07-15T10:55:08Z", "todoAt": "2026-07-15T15:45:47Z", "inProgressAt": null, "cycleHours": 482.9, "prOpenHours": 0.3, "prSummary": {"prType": "Pull Request", "problem": "", "solution": "Release v0.6.0", "keyChanges": []}, "prNumber": 706, "prTitle": "v0.6.0", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/706", "prCreatedAt": "2026-08-04T13:30:42Z", "mergedAt": "2026-08-04T13:49:37Z"}, {"number": 637, "title": "Upgrade to React 18", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/637", "status": "Todo", "sprint": "Sprint 38", "labels": ["enhancement", "triage/accepted", "sdk-maintenance"], "assignedAt": "2026-07-15T10:54:44Z", "todoAt": "2026-07-15T15:39:58Z", "inProgressAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 468, "title": "DNSPolicy ProviderRefs Empty String Bypass", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/468", "status": "Todo", "sprint": "Unassigned", "labels": ["bug", "good first issue", "triage/accepted"], "assignedAt": "2026-07-29T10:45:57Z", "todoAt": "2026-07-29T10:45:57Z", "inProgressAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 614, "title": "API Product deletion type to confirm missing when deleting from details", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/614", "status": "Done", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-08T11:43:52Z", "todoAt": "2026-07-08T11:44:25Z", "inProgressAt": "2026-07-17T08:50:45Z", "cycleHours": 334.0, "prOpenHours": 18.6, "prSummary": {"prType": "Bug Fix", "problem": "APIProduct detail page Actions dropdown used the SDK's built-in useDeleteModal (simple checkbox confirmation), while the list page kebab already used the custom type-to-confirm APIProductDeleteModal \u2014 inconsistent delete UX across views.", "solution": "Replaced useDeleteModal with the SDK's useModal hook to launch APIProductDeleteModal from the Actions dropdown, matching PatternFly's 'Confirm a destructive action' guidelines. Detail page now navigates back to the APIProducts list after successful deletion.", "keyChanges": ["Added optional onDeleteSuccess callback to APIProductDeleteModal so detail page can navigate away on success", "Moved setIsDeleting cleanup out of finally into catch only \u2014 avoids setState-on-unmount warnings", "Switched useAPIProductActions from useDeleteModal to useModal with APIProductDeleteModalWrapper", "Updated e2e delete flow to type the resource name into #confirm-delete instead of checking a checkbox"]}, "prNumber": 676, "prTitle": "Type-to-confirm APIProduct Actions Menu", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/676", "prCreatedAt": "2026-07-21T15:09:04Z", "mergedAt": "2026-07-22T09:43:16Z"}, {"number": 590, "title": "Details pages content heavily left-aligned", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/590", "status": "Done", "sprint": "Sprint 37", "labels": ["good first issue", "triage/accepted"], "assignedAt": "2026-07-02T16:53:45Z", "todoAt": "2026-07-02T16:52:16Z", "inProgressAt": "2026-07-06T10:00:45Z", "cycleHours": 98.3, "prOpenHours": 2.7, "prSummary": {"prType": "Style / Formatting", "problem": "Header contents inside the DNS, TLS, and OIDC policy creation tabs were extremely left-aligned, mismatching the rest of the page layout.", "solution": "Identified a PatternFly `pf-m-no-padding` modifier class applied to the body wrapper of each policy header. Commenting it out restored correct alignment across all three policy pages.", "keyChanges": ["Commented out `pf-m-no-padding` class on DNS, TLS, and OIDC header wrappers", "No logic changes \u2014 pure layout fix", "Verified visually: headers now align with other page content"]}, "prNumber": 602, "prTitle": "Alignment Issue Fix", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/602", "prCreatedAt": "2026-07-06T16:31:14Z", "mergedAt": "2026-07-06T19:11:11Z"}, {"number": 583, "title": "Add GatewayClass filtering for gateway tables", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/583", "status": "Done", "sprint": "Sprint 38", "labels": ["enhancement", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-09T14:09:42Z", "todoAt": "2026-07-09T14:09:42Z", "inProgressAt": "2026-07-29T14:56:44Z", "cycleHours": 503.8, "prOpenHours": 23.0, "prSummary": {"prType": "Feature", "problem": "Gateway tables showed all gateways including irrelevant types (e.g. waypoint gateways with gatewayClassName 'istio-waypoint'). Only Name, Namespace, and Type filters existed \u2014 no GatewayClass filter.", "solution": "Extended ResourceList with a reusable additionalFilters prop (PatternFly dropdown select), then wired a GatewayClass filter on the Overview 'Gateways - Traffic Analysis' card, populated dynamically from cluster GatewayClass resources.", "keyChanges": ["Added AdditionalFilter type and optional additionalFilters prop to ResourceList (default [])", "When an additional filter is active, toolbar text input switches to a Select dropdown with an All option", "Extended Gateway interface with spec.gatewayClassName; watch GatewayClass resources for dropdown options", "Passed GatewayClass filter into Overview gateway ResourceList comparing spec.gatewayClassName"]}, "prNumber": 698, "prTitle": "GatewayClass Filter Dropdown", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/698", "prCreatedAt": "2026-07-29T14:56:44Z", "mergedAt": "2026-07-30T13:59:10Z"}, {"number": 572, "title": "API Product deletion type to confirm UI enhancement", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/572", "status": "Done", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-01T09:46:57Z", "todoAt": "2026-06-30T14:41:03Z", "inProgressAt": "2026-07-07T09:43:46Z", "cycleHours": 167.9, "prOpenHours": 17.9, "prSummary": {"prType": "Style / Formatting", "problem": "API Product and API Key deletion modals had inconsistent UI/UX \u2014 different sizes, layouts, and confirmation patterns between the two flows.", "solution": "Used the API Key modal as a consistent base and redesigned both modals to follow PatternFly's 'Confirm a destructive action' guidelines, unifying the experience across both resource types.", "keyChanges": ["Modal size reduced from medium \u2192 small for a more focused feel", "Added warning icon and simplified messaging to a single line", "Improved placeholder text: 'Enter API Product name' for better guidance", "Simplified confirm button label from 'Delete API Product' \u2192 'Delete'", "Added useEffect hook to reliably reset the confirmation field on all close methods (Cancel, ESC, click-outside)", "Reorganised imports to match project conventions; added kuadrant.css import"]}, "prNumber": 609, "prTitle": "APIProduct/Key Delete UI Enhance", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/609", "prCreatedAt": "2026-07-07T15:44:26Z", "mergedAt": "2026-07-08T09:38:54Z"}, {"number": 571, "title": "Cancel button navigates to resource list instead of previous page", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/571", "status": "Closed", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-01T09:47:16Z", "todoAt": "2026-06-30T14:27:32Z", "inProgressAt": "2026-07-07T17:30:44Z", "cycleHours": 216.9, "prOpenHours": null, "prSummary": {"prType": "Closed \u2014 Won't Fix", "problem": "Cancel buttons on create/edit forms (policies, Gateways, HTTPRoutes \u2014 Form and YAML view) navigate to the resource list page instead of the previous page, breaking natural navigation flow.", "solution": "Closed as not technically feasible. The OpenShift Console SDK's ResourceYAMLEditor does not expose an onCancel prop or any way to customise the cancel button. A custom YAML editor wrapper would be fragile and unnecessary given the planned form view work.", "keyChanges": ["Custom YAML editor approach investigated and ruled out", "Textarea alternative considered and discarded", "Confirmed via SDK type definitions: cancel customisation is not supported", "Same broken behaviour found on HTTPRoutes and Gateway YAML creation", "Resolution deferred to upcoming form view redesign"]}, "mergedAt": "2026-07-10T10:40:43Z"}]};
+    const BOARD = {"title": "UI Touch Grass", "project": {"owner": "Kuadrant", "number": 18, "url": "https://github.com/orgs/Kuadrant/projects/18", "title": "Kuadrant"}, "projects": [{"owner": "Kuadrant", "number": 18, "url": "https://github.com/orgs/Kuadrant/projects/18", "title": "Kuadrant"}], "repos": ["Kuadrant/developer-portal-controller", "Kuadrant/kuadrant-console-plugin", "Kuadrant/kuadrant-backstage-plugin"], "person": {"login": "pascazzioIsAbyayalan", "name": "Grettel Pascacio"}, "fetchedAt": "2026-08-05T16:55:13Z", "issues": [{"number": 625, "title": "Fix hardcoded user-facing strings across policy and resource action hooks", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/625", "repo": "Kuadrant/kuadrant-console-plugin", "status": "In Progress", "sprint": "Sprint 38", "labels": ["enhancement", "good first issue", "triage/accepted"], "assignedAt": "2026-07-13T08:30:40Z", "todoAt": "2026-07-13T08:30:40Z", "inProgressAt": "2026-07-29T15:25:18Z", "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 664, "title": "docs: create CI.md to document e2e pipeline design and decisions", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/664", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Todo", "sprint": "Sprint 38", "labels": ["documentation", "good first issue", "triage/accepted"], "assignedAt": "2026-07-22T10:22:56Z", "todoAt": "2026-07-22T10:22:56Z", "inProgressAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 651, "title": "Migrate to @openshift-console/dynamic-plugin-sdk 4.22.0", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/651", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Todo", "sprint": "Sprint 38", "labels": ["dependencies", "epic", "triage/accepted", "sdk-maintenance"], "assignedAt": "2026-07-15T10:55:08Z", "todoAt": "2026-07-15T15:45:47Z", "inProgressAt": null, "cycleHours": 509.2, "prOpenHours": 0.4, "prSummary": {"prType": "Chore", "problem": "", "solution": "Bumps react-i18next from ^11.7.3 to ~16.5.8 to align with what OCP 4.22 console provides. Lands ahead of the SDK 4.22 bump (#651).", "keyChanges": ["react-i18next pinned to ~16.5.8 (tilde matches OCP 4.22 exactly)", "TFunction import moved from react-i18next to i18next (v16 dropped the re-export)", "transpileOnly: true added to ts-loader \u2014 react-i18next 16 augments React.HTMLAttributes.children, widening the type and causing spurious PatternFly prop check failures", "diagnostics: false added to ts-jest for the same reason", "validateSharedModules: false on ConsoleRemotePlugin \u2014 SDK 1.x still declares ^11 but OCP 4.22 provides ~16.5.8", "All three workarounds are transitional and should be removed after the SDK 4.22 bump (#651)."]}, "prNumber": 714, "prTitle": "chore: bump react-i18next to ~16.5.8", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/714", "prCreatedAt": "2026-08-05T15:42:31Z", "mergedAt": "2026-08-05T16:06:58Z"}, {"number": 637, "title": "Upgrade to React 18", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/637", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Todo", "sprint": "Sprint 38", "labels": ["enhancement", "triage/accepted", "sdk-maintenance"], "assignedAt": "2026-07-15T10:54:44Z", "todoAt": "2026-07-15T15:39:58Z", "inProgressAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 468, "title": "DNSPolicy ProviderRefs Empty String Bypass", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/468", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Todo", "sprint": "Unassigned", "labels": ["bug", "good first issue", "triage/accepted"], "assignedAt": "2026-07-29T10:45:57Z", "todoAt": "2026-07-29T10:45:57Z", "inProgressAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 317, "title": "Typo own tier selection dropbox", "url": "https://github.com/Kuadrant/kuadrant-backstage-plugin/issues/317", "repo": "Kuadrant/kuadrant-backstage-plugin", "status": "Todo", "sprint": "Unassigned", "labels": ["bug", "triage/accepted"], "assignedAt": "2026-07-29T10:33:30Z", "todoAt": "2026-07-29T10:33:30Z", "inProgressAt": null, "cycleHours": null, "prOpenHours": null, "prSummary": null}, {"number": 614, "title": "API Product deletion type to confirm missing when deleting from details", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/614", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Done", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-08T11:43:52Z", "todoAt": "2026-07-08T11:44:25Z", "inProgressAt": "2026-07-17T08:50:45Z", "cycleHours": 334.0, "prOpenHours": 18.6, "prSummary": {"prType": "Bug fix", "problem": "APIProduct detail page Actions dropdown used the SDK's built-in useDeleteModal for deletion, which shows a simple \"Are you sure?\" checkbox confirmation. The list page kebab menu already uses the custom type-to-confirm APIProductDeleteModal (enhanced in PR #609), creating an inconsistent delete experience across the two views.", "solution": "Replaced useDeleteModal with the SDK's useModal hook to launch APIProductDeleteModal from the Actions dropdown, matching PatternFly design guidelines for \"Confirm a destructive action\". Detail page now navigates back to the APIProducts list after successful deletion.", "keyChanges": ["onDeleteSuccess callback: Added optional prop to APIProductDeleteModal to distinguish successful deletion from cancel \u2014 detail page navigates away, list page behaviour unchanged", "setIsDeleting cleanup: Moved out of finally block and into catch only, preventing React setState-on-unmount warnings when the modal is closed after deletion", "Replaced useDeleteModal with useModal: Switched from the SDK's built-in delete confirmation to the generic modal launcher in useAPIProductActions", "APIProductDeleteModalWrapper: Added wrapper component that bridges the Console ModalProvider API (closeModal prop) with APIProductDeleteModal, handling post-delete navigation to /kuadrant/apiproducts/ns/{namespace}", "Updated delete confirmation flow: Test now types the resource name into #confirm-delete input instead of checking a checkbox, matching the new type-to-confirm behaviour"]}, "prNumber": 676, "prTitle": "Type-to-confirm APIProduct Actions Menu", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/676", "prCreatedAt": "2026-07-21T15:09:04Z", "mergedAt": "2026-07-22T09:43:16Z"}, {"number": 590, "title": "Details pages content heavily left-aligned", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/590", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Done", "sprint": "Sprint 37", "labels": ["good first issue", "triage/accepted"], "assignedAt": "2026-07-02T16:53:45Z", "todoAt": "2026-07-02T16:52:16Z", "inProgressAt": "2026-07-06T10:00:45Z", "cycleHours": 98.3, "prOpenHours": 2.7, "prSummary": {"prType": "Style / Formatting", "problem": "Header contents inside the DNS, TLS, and OIDC policy creation tabs were extremely left-aligned, mismatching the rest of the page layout.", "solution": "Identified a PatternFly `pf-m-no-padding` modifier class applied to the body wrapper of each policy header. Commenting it out restored correct alignment across all three policy pages.", "keyChanges": ["Commented out `pf-m-no-padding` class on DNS, TLS, and OIDC header wrappers", "No logic changes \u2014 pure layout fix", "Verified visually: headers now align with other page content"]}, "prNumber": 602, "prTitle": "Alignment Issue Fix", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/602", "prCreatedAt": "2026-07-06T16:31:14Z", "mergedAt": "2026-07-06T19:11:11Z"}, {"number": 583, "title": "Add GatewayClass filtering for gateway tables", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/583", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Done", "sprint": "Sprint 38", "labels": ["enhancement", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-09T14:09:42Z", "todoAt": "2026-07-09T14:09:42Z", "inProgressAt": "2026-07-29T14:56:44Z", "cycleHours": 503.8, "prOpenHours": 23.0, "prSummary": {"prType": "New feature", "problem": "Gateway tables displayed all gateways including irrelevant types like waypoint gateways (gatewayClassName: 'istio-waypoint'), adding noise to the UI. No filtering by GatewayClass existed \u2014 only Name, Namespace, and Type (resource kind) were available.", "solution": "Extended ResourceList with a generic additionalFilters prop following PatternFly dropdown select patterns, keeping the component reusable for future filter needs. Wired up a GatewayClass dropdown filter in the \"Gateways - Traffic Analysis\" card on the Overview page, populated dynamically from cluster GatewayClass resources.", "keyChanges": ["AdditionalFilter type: Defines a custom filter shape with label, options, and filterFn \u2014 fully decoupled from any specific resource", "additionalFilters prop: Optional array defaulting to [], so all existing ResourceList callers are unaffected", "Conditional toolbar rendering: When an additional filter is selected, the text input is replaced with a Select dropdown of available values plus an \"All\" default", "Filter logic branching: The useEffect checks whether the active filter is an additional filter and uses its filterFn, otherwise the existing Name/Namespace/Type text matching runs unchanged", "Gateway interface extended: Added spec.gatewayClassName for type-safe access during filtering", "GatewayClass resource watch: Fetches all GatewayClass resources from the cluster using the existing RESOURCES.GatewayClass.gvk definition", "gatewayClassNames memo: Extracts names from watched GatewayClasses into a string array for the dropdown options", "additionalFilters prop: Passed to the Gateway ResourceList with a single \"GatewayClass\" filter that compares spec.gatewayClassName against the selected value"]}, "prNumber": 698, "prTitle": "GatewayClass Filter Dropdown", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/698", "prCreatedAt": "2026-07-29T14:56:44Z", "mergedAt": "2026-07-30T13:59:10Z"}, {"number": 572, "title": "API Product deletion type to confirm UI enhancement", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/572", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Done", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-01T09:46:57Z", "todoAt": "2026-06-30T14:41:03Z", "inProgressAt": "2026-07-07T09:43:46Z", "cycleHours": 167.9, "prOpenHours": 17.9, "prSummary": {"prType": "Code style changes", "problem": "API Product and API Key Modals had an inconsistent UI and UX could be improved. API Key Modal used as a base design, improved the basic layout to match Patternfly design guidelines to \"Confirm a destructive action\".", "solution": "Form adjusted and enhanced lifecycle management. API Product Modal matches API Key Modal.", "keyChanges": ["Simplified FormGroup", "Improved placeholder: Changed to \"Enter API Product name\"", "for better guidance", "Added input type: Explicitly set type=\"text\" on TextInput"]}, "prNumber": 609, "prTitle": "APIProduct/Key Delete UI Enhance", "prUrl": "https://github.com/Kuadrant/kuadrant-console-plugin/pull/609", "prCreatedAt": "2026-07-07T15:44:26Z", "mergedAt": "2026-07-08T09:38:54Z"}, {"number": 571, "title": "Cancel button navigates to resource list instead of previous page", "url": "https://github.com/Kuadrant/kuadrant-console-plugin/issues/571", "repo": "Kuadrant/kuadrant-console-plugin", "status": "Closed", "sprint": "Sprint 37", "labels": ["enhancement", "good first issue", "triage/accepted", "maintainers-only"], "assignedAt": "2026-07-01T09:47:16Z", "todoAt": "2026-06-30T14:27:32Z", "inProgressAt": "2026-07-07T17:30:44Z", "cycleHours": 216.9, "prOpenHours": null, "prSummary": {"prType": "Closed \u2014 Won't Fix", "problem": "Cancel buttons on create/edit forms (policies, Gateways, HTTPRoutes \u2014 Form and YAML view) navigate to the resource list page instead of the previous page, breaking natural navigation flow.", "solution": "Closed as not technically feasible. The OpenShift Console SDK's ResourceYAMLEditor does not expose an onCancel prop or any way to customise the cancel button. A custom YAML editor wrapper would be fragile and unnecessary given the planned form view work.", "keyChanges": ["Custom YAML editor approach investigated and ruled out", "Textarea alternative considered and discarded", "Confirmed via SDK type definitions: cancel customisation is not supported", "Same broken behaviour found on HTTPRoutes and Gateway YAML creation", "Resolution deferred to upcoming form view redesign"]}, "mergedAt": "2026-07-10T10:40:43Z"}]};
     const ISSUES = BOARD.issues || [];
     const STATUS_ORDER = ["Todo", "In Progress", "Ready for Review", "Done", "Closed"];
     const OPEN_ORDER = ["In Progress", "Ready for Review", "Todo"];
@@ -374,6 +401,13 @@
         .replace(/&/g, "&amp;").replace(/</g, "&lt;")
         .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
+    function issueRepo(issue) {
+      if (issue.repo) return issue.repo;
+      const m = String(issue.url || "").match(/github\.com\/([^/]+\/[^/]+)\//);
+      return m ? m[1] : "";
+    }
+    // Normalize legacy snapshots without repo field
+    ISSUES.forEach(i => { if (!i.repo) i.repo = issueRepo(i); });
     function badgeClass(status) {
       if (status === "In Progress") return "ip";
       if (status === "Ready for Review") return "review";
@@ -493,10 +527,11 @@
       if (pieHover) setPieHover(pieHover);
     }
 
-    function renderLabelSection() {
+    function renderLabelSection(sourceIssues) {
+      const list = sourceIssues || ISSUES;
       const cat = {};
       const labelCounts = {};
-      ISSUES.forEach(i => {
+      list.forEach(i => {
         const c = primaryCategory(i);
         cat[c] = (cat[c] || 0) + 1;
         (i.labels || []).forEach(l => { labelCounts[l] = (labelCounts[l] || 0) + 1; });
@@ -512,6 +547,7 @@
       const q = document.getElementById("search").value.trim().toLowerCase();
       const label = document.getElementById("filterLabel").value;
       const sprint = document.getElementById("filterSprint").value;
+      const repo = document.getElementById("filterRepo").value;
       const date = document.getElementById("filterDate").value;
       const now = Date.now();
       const day = 86400000;
@@ -519,6 +555,7 @@
         if (q && !issue.title.toLowerCase().includes(q) && !String(issue.number).includes(q)) return false;
         if (label && !(issue.labels || []).includes(label)) return false;
         if (sprint && issue.sprint !== sprint) return false;
+        if (repo && issueRepo(issue) !== repo) return false;
         if (date !== "all") {
           const ms = new Date(issue.todoAt || issue.assignedAt).getTime();
           if (date === "thisweek" && ms < now - 7 * day) return false;
@@ -620,7 +657,7 @@
           const openH = (Date.now() - new Date(issue.assignedAt).getTime()) / 3600000;
           return `<article class="card ${cardClass(issue.status)}">
             <div class="card-head">
-              <span class="num">#${issue.number}</span>
+              <a class="num" href="${escapeHtml(issue.url)}" target="_blank" rel="noopener">#${issue.number}</a>
               <span class="spacer"></span>
               <span style="font-size:11px;color:var(--grey)">Open: <strong>${fmtHours(openH)}</strong></span>
               <span class="badge ${badgeClass(issue.status)}">${issue.status}</span>
@@ -651,7 +688,7 @@
             : null;
           return `<article class="card ${cardClass(issue.status)}">
             <div class="card-head">
-              <span class="num">#${issue.number}</span>
+              <a class="num" href="${escapeHtml(issue.url)}" target="_blank" rel="noopener">#${issue.number}</a>
               <span class="spacer"></span>
               <span style="font-size:11px;color:var(--grey)">Total: <strong>${fmtHours(issue.cycleHours)}</strong></span>
               <span class="badge ${badgeClass(issue.status)}">${issue.status}</span>
@@ -728,12 +765,14 @@
       const search = document.getElementById("search").value.trim();
       const label = document.getElementById("filterLabel").value;
       const sprint = document.getElementById("filterSprint").value;
+      const repo = document.getElementById("filterRepo").value;
       const date = document.getElementById("filterDate").value;
-      const has = search || label || sprint || date !== "all";
+      const has = search || label || sprint || repo || date !== "all";
       let html = `<span>${filtered.length === ISSUES.length ? `${ISSUES.length} issues` : `${filtered.length} of ${ISSUES.length} issues`}</span>`;
       if (search) html += `<span class="chip-x" style="background:var(--lavender)">"${escapeHtml(search)}" <button data-clear="search">✕</button></span>`;
       if (label) html += `<span class="chip-x" style="background:var(--mint)">${escapeHtml(label)} <button data-clear="label">✕</button></span>`;
       if (sprint) html += `<span class="chip-x" style="background:var(--blush)">${escapeHtml(sprint)} <button data-clear="sprint">✕</button></span>`;
+      if (repo) html += `<span class="chip-x" style="background:var(--lavender)">${escapeHtml(repo)} <button data-clear="repo">✕</button></span>`;
       if (date !== "all") html += `<span class="chip-x" style="background:var(--amber-soft);color:var(--amber-text)">${date === "thisweek" ? "This week" : date === "last2weeks" ? "Last 2 weeks" : "Older"} <button data-clear="date">✕</button></span>`;
       if (has) html += `<button type="button" id="clearAll" style="all:unset;cursor:pointer;font-size:11px;color:var(--grey);text-decoration:underline">Clear all</button>`;
       document.getElementById("chips").innerHTML = html;
@@ -741,24 +780,34 @@
 
     function render() {
       const filtered = filteredIssues();
-      const resolved = ISSUES.filter(i => i.status === "Done" || i.status === "Closed");
-      const done = ISSUES.filter(i => i.status === "Done");
+      const resolved = filtered.filter(i => i.status === "Done" || i.status === "Closed");
+      const done = filtered.filter(i => i.status === "Done");
       const avgCycle = resolved.length ? resolved.reduce((s, i) => s + (i.cycleHours || 0), 0) / resolved.length : null;
       const avgPR = done.length ? done.reduce((s, i) => s + (i.prOpenHours || 0), 0) / done.length : null;
 
       document.getElementById("title").textContent = BOARD.title;
       document.title = BOARD.title;
-      const repos = (BOARD.repos || []).join(", ") || BOARD.project.owner;
+      const projects = (BOARD.projects && BOARD.projects.length)
+        ? BOARD.projects
+        : (BOARD.project ? [BOARD.project] : []);
+      const projectLinks = projects.map(p =>
+        `<a href="${escapeHtml(p.url || "#")}" target="_blank" rel="noopener">${escapeHtml(p.owner)} #${p.number}</a>`
+      ).join(" · ");
+      const repoCount = (BOARD.repos || []).length;
+      const repoHint = repoCount
+        ? `${repoCount} repo${repoCount === 1 ? "" : "s"}`
+        : "repos";
       document.getElementById("subtitle").innerHTML =
-        `${repos} · <a href="${BOARD.project.url}" target="_blank" rel="noopener">Project #${BOARD.project.number}</a> · Last fetched ${fmtDate(BOARD.fetchedAt)}`;
+        `${repoHint}${projectLinks ? " · " + projectLinks : ""} · Last fetched ${fmtDate(BOARD.fetchedAt)}`;
 
       document.getElementById("stats").innerHTML = [
-        [ISSUES.length, "Issues assigned"],
+        [filtered.length, filtered.length === ISSUES.length ? "Issues assigned" : "Issues (filtered)"],
         [resolved.length, "Resolved"],
         [fmtHours(avgCycle), "Avg assigned → resolved"],
         [done.length ? fmtHours(avgPR) : "—", "Avg PR open → merged"],
       ].map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
 
+      renderLabelSection(filtered);
       renderChips(filtered);
       const main = document.getElementById("main");
       if (!filtered.length) main.innerHTML = emptyState();
@@ -774,6 +823,7 @@
       document.getElementById("search").value = "";
       document.getElementById("filterLabel").value = "";
       document.getElementById("filterSprint").value = "";
+      document.getElementById("filterRepo").value = "";
       document.getElementById("filterDate").value = "all";
       render();
     }
@@ -805,6 +855,7 @@
           if (k === "search") document.getElementById("search").value = "";
           if (k === "label") document.getElementById("filterLabel").value = "";
           if (k === "sprint") document.getElementById("filterSprint").value = "";
+          if (k === "repo") document.getElementById("filterRepo").value = "";
           if (k === "date") document.getElementById("filterDate").value = "all";
           render();
         };
@@ -816,17 +867,23 @@
     function initFilters() {
       const labels = [...new Set(ISSUES.flatMap(i => i.labels || []))].sort();
       const sprints = [...new Set(ISSUES.map(i => i.sprint).filter(Boolean))].sort();
+      const repos = [...new Set([
+        ...(BOARD.repos || []),
+        ...ISSUES.map(i => issueRepo(i)).filter(Boolean),
+      ])].sort();
       document.getElementById("filterLabel").innerHTML =
         `<option value="">All labels</option>` + labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join("");
       document.getElementById("filterSprint").innerHTML =
         `<option value="">All sprints</option>` + sprints.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+      document.getElementById("filterRepo").innerHTML =
+        `<option value="">All repositories</option>` + repos.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
     }
 
     document.getElementById("themeToggle").onclick = () => {
       setTheme(getTheme() === "light" ? "dark" : "light");
-      renderLabelSection();
+      renderLabelSection(filteredIssues());
     };
-    ["search", "filterLabel", "filterSprint", "filterDate"].forEach(id => {
+    ["search", "filterLabel", "filterSprint", "filterRepo", "filterDate"].forEach(id => {
       document.getElementById(id).addEventListener(id === "search" ? "input" : "change", render);
     });
     document.querySelectorAll(".pill").forEach(p => p.addEventListener("click", () => {
@@ -835,10 +892,141 @@
       render();
     }));
 
+    // ── GitHub sync (via local configure server) ─────────────────────
+    const SYNC_CANDIDATES = [
+      (typeof location !== "undefined" && location.protocol.startsWith("http")
+        ? location.origin : null),
+      "http://127.0.0.1:8765",
+      "http://localhost:8765",
+    ].filter(Boolean);
+    let syncBase = null;
+    let syncBusy = false;
+    let autoSyncTimer = null;
+    const AUTO_SYNC_MS = 5 * 60 * 1000;
+
+    function setSyncStatus(kind, text) {
+      const el = document.getElementById("syncStatus");
+      if (!text) {
+        el.className = "sync-status hidden";
+        el.textContent = "";
+        return;
+      }
+      el.className = "sync-status" + (kind ? " " + kind : "");
+      el.textContent = text;
+    }
+
+    async function probeSyncServer() {
+      for (const base of SYNC_CANDIDATES) {
+        try {
+          const res = await fetch(base + "/api/status", { cache: "no-store" });
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (typeof data.authed === "boolean") {
+            syncBase = base;
+            const btn = document.getElementById("syncBtn");
+            btn.disabled = false;
+            btn.title = data.authed
+              ? "Fetch latest issues from GitHub and refresh this board"
+              : "Configure server is up, but GitHub auth is missing (gh auth login)";
+            document.getElementById("autoSyncWrap").classList.remove("hidden");
+            if (localStorage.getItem("ctb-auto-sync") === "1") {
+              document.getElementById("autoSync").checked = true;
+              startAutoSync();
+            }
+            return true;
+          }
+        } catch (_) { /* try next */ }
+      }
+      syncBase = null;
+      document.getElementById("syncBtn").disabled = true;
+      document.getElementById("syncBtn").title =
+        "Start the local server first: python3 scripts/configure.py — then open http://127.0.0.1:8765/board";
+      document.getElementById("autoSyncWrap").classList.add("hidden");
+      return false;
+    }
+
+    async function pollSync() {
+      for (let i = 0; i < 600; i++) {
+        const res = await fetch(syncBase + "/api/build", { cache: "no-store" });
+        const b = await res.json();
+        if (b.running) {
+          setSyncStatus("", b.message || "Syncing with GitHub…");
+        }
+        if (b.done) {
+          if (b.error) throw new Error(b.error);
+          setSyncStatus("ok", "Synced. Reloading…");
+          // Prefer board URL from server when we are not already on /board
+          const next = b.boardUrl || (syncBase + "/board");
+          if (location.href.startsWith("http") && location.pathname.endsWith("/board")) {
+            location.reload();
+          } else {
+            location.href = next + "?t=" + Date.now();
+          }
+          return;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      throw new Error("Sync timed out. Check the terminal running configure.py.");
+    }
+
+    async function syncWithGitHub() {
+      if (syncBusy) return;
+      if (!syncBase && !(await probeSyncServer())) {
+        setSyncStatus(
+          "error",
+          "Local sync server not running. In a terminal: python3 scripts/configure.py — then open the board at http://127.0.0.1:8765/board"
+        );
+        return;
+      }
+      syncBusy = true;
+      const btn = document.getElementById("syncBtn");
+      btn.disabled = true;
+      btn.classList.add("busy");
+      btn.textContent = "Syncing…";
+      setSyncStatus("", "Starting sync with GitHub…");
+      try {
+        const start = await fetch(syncBase + "/api/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        const data = await start.json().catch(() => ({}));
+        if (!start.ok && start.status !== 202) {
+          throw new Error(data.error || ("Sync failed (" + start.status + ")"));
+        }
+        await pollSync();
+      } catch (e) {
+        setSyncStatus("error", e.message || String(e));
+        btn.disabled = false;
+        btn.classList.remove("busy");
+        btn.textContent = "Sync with GitHub";
+        syncBusy = false;
+      }
+    }
+
+    function startAutoSync() {
+      stopAutoSync();
+      autoSyncTimer = setInterval(() => {
+        if (!document.hidden && !syncBusy) syncWithGitHub();
+      }, AUTO_SYNC_MS);
+    }
+    function stopAutoSync() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      autoSyncTimer = null;
+    }
+
+    document.getElementById("syncBtn").onclick = () => syncWithGitHub();
+    document.getElementById("autoSync").onchange = (e) => {
+      localStorage.setItem("ctb-auto-sync", e.target.checked ? "1" : "0");
+      if (e.target.checked) startAutoSync();
+      else stopAutoSync();
+    };
+
     setTheme(getTheme());
     initFilters();
     renderLabelSection();
     render();
+    probeSyncServer();
   </script>
 </body>
 </html>
