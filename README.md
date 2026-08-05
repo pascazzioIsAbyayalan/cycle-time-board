@@ -25,7 +25,7 @@ clone  →  gh auth login  →  configure.py  →  fetch.py  →  open dist/inde
 
 - Summary stats + interactive label donut
 - Search / date / label / sprint filters
-- **Cycle time** view (Open / Completed, timelines, PR summaries)
+- **Cycle time** view (Open / Completed, timelines, PR summaries from each PR’s description)
 - **Board** and **Sprint** views
 - Light / dark mode
 
@@ -218,6 +218,7 @@ In chat (with `gh` working in the terminal):
 | Auth errors | `gh auth login` or set `GH_TOKEN`; authorize org SSO |
 | No Projects listed | Open the board in GitHub in a browser; token needs `read:project` (+ `read:org` / SSO) |
 | Empty board | Issues must be **assigned to you**; check `repos` and optional `area` |
+| No PR Solution Summary | Fetch builds summaries from the **PR description** (`## Description`, `## Changes made`, type checkboxes). Empty/template-only PR bodies produce no summary. Re-run `python3 scripts/fetch.py` after this fix. |
 | Wrong user | `gh api user --jq .login` |
 
 ---

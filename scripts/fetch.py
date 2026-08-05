@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -112,6 +113,19 @@ query($owner: String!, $repo: String!, $number: Int!) {
           }
         }
       }
+      closedByPullRequestsReferences(first: 5) {
+        nodes {
+          number
+          title
+          url
+          createdAt
+          mergedAt
+          closedAt
+          state
+          author { login }
+          body
+        }
+      }
       timelineItems(last: 80, itemTypes: [
         ASSIGNED_EVENT, CLOSED_EVENT, CROSS_REFERENCED_EVENT, REOPENED_EVENT
       ]) {
@@ -182,15 +196,25 @@ def assigned_at_for(issue: dict, login: str) -> str | None:
 
 
 def best_pr(issue: dict, login: str) -> dict | None:
-    prs = []
+    prs: list[dict] = []
+    seen: set[int] = set()
+
+    def add(pr: dict | None) -> None:
+        if not pr or not pr.get("number"):
+            return
+        n = int(pr["number"])
+        if n in seen:
+            return
+        seen.add(n)
+        prs.append(pr)
+
+    for pr in issue.get("closedByPullRequestsReferences", {}).get("nodes", []) or []:
+        add(pr)
     for t in issue.get("timelineItems", {}).get("nodes", []):
         if t.get("__typename") != "CrossReferencedEvent":
             continue
-        src = t.get("source") or {}
-        if not src.get("number"):
-            continue
-        # Prefer PRs by the assignee; otherwise keep any merged PR
-        prs.append(src)
+        add(t.get("source") or {})
+
     if not prs:
         return None
     by_author = [p for p in prs if (p.get("author") or {}).get("login") == login]
@@ -221,6 +245,234 @@ def map_status(project_status: str | None, issue_state: str, state_reason: str |
     return "Todo"
 
 
+_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*)$")
+_BULLET_RE = re.compile(r"^\s*([-*+]|\d+\.)\s+(.*)$")
+_CHECKBOX_RE = re.compile(r"^\s*[-*+]\s+\[([ xX])\]\s+(.*)$")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_ISSUE_REF_RE = re.compile(
+    r"^\s*(fixes|closes|resolves|fixed|closed|resolved)\s+#\d+\s*$",
+    re.IGNORECASE,
+)
+
+# Sections whose body becomes the main narrative / key-change list / type line.
+_SOLUTION_ALIASES = {
+    "description",
+    "summary",
+    "solution",
+    "what changed",
+    "overview",
+    "context",
+}
+_PROBLEM_ALIASES = {
+    "problem",
+    "issue",
+    "background",
+    "motivation",
+    "why",
+}
+_CHANGES_ALIASES = {
+    "changes made",
+    "changes",
+    "key changes",
+    "changelog",
+    "notable changes",
+}
+_TYPE_ALIASES = {
+    "type of change",
+    "type",
+    "change type",
+}
+_SKIP_SECTIONS = {
+    "test plan",
+    "tests",
+    "screenshots",
+    "checklist",
+    "how to test",
+    "verification",
+    "related",
+    "references",
+    "cc",
+}
+
+
+def _strip_md(text: str) -> str:
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _section_map(body: str) -> dict[str, str]:
+    """Split a markdown PR body into heading → section text."""
+    body = _HTML_COMMENT_RE.sub("", body or "")
+    sections: dict[str, list[str]] = {"": []}
+    current = ""
+    for raw in body.splitlines():
+        m = _HEADING_RE.match(raw)
+        if m:
+            current = m.group(1).strip().lower()
+            # Drop trailing punctuation / badges from heading text
+            current = re.sub(r"[:：]\s*$", "", current)
+            sections.setdefault(current, [])
+            continue
+        sections.setdefault(current, []).append(raw)
+    return {k: "\n".join(v).strip() for k, v in sections.items() if "\n".join(v).strip()}
+
+
+def _pick_section(sections: dict[str, str], aliases: set[str]) -> str:
+    for key, text in sections.items():
+        if key in aliases:
+            return text
+    for key, text in sections.items():
+        for alias in aliases:
+            if alias in key:
+                return text
+    return ""
+
+
+def _lines_of_substance(text: str) -> list[str]:
+    out: list[str] = []
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line or line == "---":
+            continue
+        if line.startswith("<!--"):
+            continue
+        if _ISSUE_REF_RE.match(line):
+            continue
+        if _HEADING_RE.match(line):
+            continue
+        cb = _CHECKBOX_RE.match(line)
+        if cb:
+            # Keep only checked type-of-change style items elsewhere
+            continue
+        b = _BULLET_RE.match(line)
+        if b:
+            item = _strip_md(b.group(2))
+            if item:
+                out.append(item)
+            continue
+        # Bold mini-headings inside a section (e.g. **Modal Lifecycle**)
+        if re.fullmatch(r"\*\*[^*]+\*\*", line):
+            continue
+        cleaned = _strip_md(line)
+        if cleaned:
+            out.append(cleaned)
+    return out
+
+
+def _checked_items(text: str) -> list[str]:
+    items = []
+    for raw in (text or "").splitlines():
+        cb = _CHECKBOX_RE.match(raw)
+        if not cb or cb.group(1).lower() != "x":
+            continue
+        item = _strip_md(cb.group(2))
+        # Prefer the bracket label: "[fix] Bug fix …" → "Bug fix"
+        m = re.match(r"\[([^\]]+)\]\s*(.*)", item)
+        if m:
+            label, rest = m.group(1).strip(), m.group(2).strip()
+            # "Bug fix (non-breaking…)" from rest if label is short keyword
+            if rest:
+                rest = re.sub(r"^\((.+)\)$", r"\1", rest)
+                item = rest.split("(")[0].strip() or label
+            else:
+                item = label
+        if item:
+            items.append(item)
+    return items
+
+
+def _join_blurb(lines: list[str], *, limit: int = 700) -> str:
+    if not lines:
+        return ""
+    text = " ".join(lines) if len(lines) == 1 else " ".join(
+        (ln if ln.endswith((".", "!", "?")) else ln + ".") for ln in lines
+    )
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > limit:
+        text = text[: limit - 1].rsplit(" ", 1)[0] + "…"
+    return text
+
+
+def _infer_pr_type(type_section: str, title: str) -> str:
+    checked = _checked_items(type_section)
+    if checked:
+        return checked[0][:80]
+    t = (title or "").lower()
+    if t.startswith("fix") or "bug" in t:
+        return "Bug Fix"
+    if t.startswith("docs") or "documentation" in t:
+        return "Documentation"
+    if t.startswith("chore") or t.startswith("deps"):
+        return "Chore"
+    if t.startswith("feat"):
+        return "Feature"
+    return "Pull Request"
+
+
+def parse_pr_body(body: str, title: str = "") -> dict:
+    """Build a board PR summary from a typical GitHub PR description."""
+    sections = _section_map(body)
+    # Ignore boilerplate sections when falling back to preamble
+    usable = {
+        k: v
+        for k, v in sections.items()
+        if k == "" or k not in _SKIP_SECTIONS
+    }
+
+    problem_lines = _lines_of_substance(_pick_section(usable, _PROBLEM_ALIASES))
+    solution_src = _pick_section(usable, _SOLUTION_ALIASES) or usable.get("", "")
+    solution_lines = _lines_of_substance(solution_src)
+    changes_src = _pick_section(usable, _CHANGES_ALIASES)
+    key_changes = _lines_of_substance(changes_src)[:8]
+
+    # Description-only templates often mix problem + solution bullets.
+    # If there is no dedicated Problem section, use the first half as context
+    # when we have enough bullets and a Changes section (or ≥4 bullets).
+    problem = _join_blurb(problem_lines, limit=500)
+    solution = _join_blurb(solution_lines, limit=700)
+    if not problem and len(solution_lines) >= 4:
+        split = max(1, len(solution_lines) // 2)
+        problem = _join_blurb(solution_lines[:split], limit=500)
+        solution = _join_blurb(solution_lines[split:], limit=700)
+    elif not problem and len(solution_lines) >= 2 and key_changes:
+        problem = _join_blurb(solution_lines[:1], limit=500)
+        solution = _join_blurb(solution_lines[1:], limit=700)
+
+    if not solution and not problem and not key_changes:
+        # Last resort: any substantive lines in the whole body
+        all_lines = []
+        for key, text in usable.items():
+            if key in _SKIP_SECTIONS or key in _TYPE_ALIASES:
+                continue
+            all_lines.extend(_lines_of_substance(text))
+        solution = _join_blurb(all_lines[:5], limit=700)
+
+    return {
+        "prType": _infer_pr_type(_pick_section(sections, _TYPE_ALIASES), title),
+        "problem": problem,
+        "solution": solution,
+        "keyChanges": key_changes,
+    }
+
+
+def _summary_richness(summary: dict | None) -> int:
+    if not summary:
+        return 0
+    score = 0
+    if summary.get("problem"):
+        score += 2
+    if summary.get("solution"):
+        score += 1
+    score += min(len(summary.get("keyChanges") or []), 4)
+    # Prefer real types over the generic placeholder
+    if summary.get("prType") and summary["prType"] not in {"Pull Request", ""}:
+        score += 1
+    return score
+
+
 def summarize_pr(pr: dict | None, status: str) -> dict | None:
     if not pr:
         if status == "Closed":
@@ -231,15 +483,17 @@ def summarize_pr(pr: dict | None, status: str) -> dict | None:
                 "keyChanges": [],
             }
         return None
-    body = pr.get("body") or ""
-    # Keep a light summary; agent / skill can enrich later
-    first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
-    return {
-        "prType": "Pull Request",
-        "problem": "",
-        "solution": first[:400],
-        "keyChanges": [],
-    }
+    parsed = parse_pr_body(pr.get("body") or "", pr.get("title") or "")
+    if not parsed["problem"] and not parsed["solution"] and not parsed["keyChanges"]:
+        return None
+    return parsed
+
+
+def pick_summary(existing: dict | None, parsed: dict | None) -> dict | None:
+    """Keep a previously enriched summary only when it is richer than a fresh parse."""
+    if _summary_richness(parsed) >= _summary_richness(existing):
+        return parsed or existing
+    return existing or parsed
 
 
 def load_existing(login: str) -> tuple[dict[int, dict], dict[int, dict]]:
@@ -310,7 +564,10 @@ def fetch_person(login: str, name: str, cfg: dict) -> dict:
             if pr_open is None:
                 pr_open = prev_meta.get("prOpenHours")
 
-            summary = existing_summaries.get(issue["number"]) or summarize_pr(pr, status)
+            summary = pick_summary(
+                existing_summaries.get(issue["number"]),
+                summarize_pr(pr, status),
+            )
 
             item = {
                 "number": issue["number"],
