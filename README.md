@@ -1,138 +1,192 @@
 # Cycle Time Board
 
-A personal **GitHub Project cycle-time board** you can open in the browser or in Cursor.
+Personal cycle-time board for **your** GitHub Project issues — as a static HTML page or a Cursor canvas.
 
-It shows **your** assigned issues (identity comes from your GitHub login/token) for a Project — default: Kuadrant Project #18 · UI Touch Grass — with:
+## Important: you choose the board
 
-- Summary stats and an interactive label donut chart
+This package ships **without** a default Project (nothing is pre-pointed at Kuadrant or any other org).
+
+| Step | What happens |
+| ---- | ------------ |
+| 1. Authenticate | GitHub knows who you are (`gh` or `GH_TOKEN`) |
+| 2. **Choose a board** | `configure.py` lists Projects you can access; you pick one + repos |
+| 3. Fetch & build | Scripts pull **your** assigned issues and write HTML / canvas |
+
+Until you run step 2, fetch/generate will stop and tell you to configure.
+
+```text
+clone  →  gh auth login  →  configure.py  →  fetch.py  →  open dist/index.html
+              (who am I?)     (which board?)   (my issues)
+```
+
+---
+
+## What you get
+
+- Summary stats + interactive label donut
 - Search / date / label / sprint filters
-- **Cycle time** view (collapsible Open / Completed sections, timelines, PR summaries)
-- **Board** and **Sprint table** views
+- **Cycle time** view (Open / Completed, timelines, PR summaries)
+- **Board** and **Sprint** views
 - Light / dark mode
 
-| Format | What you get |
-| ------ | ------------ |
-| **Browser HTML** | `dist/index.html` — static snapshot, no server |
-| **Cursor canvas + skill** | Board beside chat + agent refresh workflow |
+| Output | File |
+| ------ | ---- |
+| Browser (no server) | `dist/index.html` |
+| Cursor canvas | `dist/cycle-time-board.canvas.tsx` |
+
+**GitHub MCP is not required.** Scripts use the `gh` CLI (or `GH_TOKEN`). The HTML file never calls GitHub from the browser.
 
 ---
 
 ## Prerequisites
 
-| Requirement | Why |
-| ----------- | --- |
-| [Python 3](https://www.python.org/) | Runs fetch + generate scripts |
-| [GitHub CLI](https://cli.github.com/) (`gh`) **or** a GitHub token in `GH_TOKEN` | Authenticates API calls |
-| Access to the target org/project/repos | Scripts read Project fields and your assigned issues |
-| [Cursor](https://cursor.com/) *(optional)* | Skill + canvas only |
-
-**You do not need the GitHub MCP** in Cursor for this package. Scripts talk to GitHub through `gh` (which uses your login or `GH_TOKEN`). Cursor’s GitHub MCP is unrelated and optional.
-
-No Node/npm install. The HTML board does **not** call GitHub from the browser.
+| Need | Why |
+| ---- | --- |
+| Python 3 | Runs the scripts |
+| [GitHub CLI](https://cli.github.com/) **or** `GH_TOKEN` | Auth + API |
+| Access to a GitHub Project and its repos | You select these in configure |
+| Cursor *(optional)* | Skill + canvas only |
 
 ---
 
-## Connect your GitHub (no JSON editing)
+## Setup (first time)
 
-Your board user is detected automatically from auth. You do **not** need to put your username in a config file.
+### 1. Clone
 
-### Option A — GitHub CLI (recommended)
+```bash
+git clone https://github.com/pascazzioIsAbyayalan/cycle-time-board.git
+cd cycle-time-board
+```
+
+### 2. Authenticate with GitHub
+
+Your username is taken from auth — do **not** put it in a config file.
 
 ```bash
 gh auth login
 gh auth status
 ```
 
-Use a browser login or paste a token when `gh` asks. For org projects you may need SSO authorization on the token.
-
-### Option B — Token environment variable
-
-Create a [personal access token](https://github.com/settings/tokens) (classic) with at least:
-
-- `repo` (or fine-grained read access to the repos)
-- `read:project`
-- `read:org` if the Project lives in a private/SSO org
-
-Then:
+Or use a classic PAT with `repo`, `read:project`, and `read:org` (if the Project is in a private/SSO org):
 
 ```bash
 export GH_TOKEN=ghp_xxxxxxxxxxxxxxxx
-# GITHUB_TOKEN is also accepted
 ```
 
-`gh` and these scripts will use that token. No `boards.json` edit required for the default Kuadrant board.
+For org boards, authorize SSO on the token if GitHub asks.
 
----
-
-## Quick start
+### 3. Choose your Project board
 
 ```bash
-git clone https://github.com/pascazzioIsAbyayalan/cycle-time-board.git
-cd cycle-time-board
-
-# 1. Authenticate (once)
-gh auth login
-# or: export GH_TOKEN=ghp_...
-
-# 2. Pull YOUR issues + build outputs
-python3 scripts/fetch.py
-python3 scripts/generate_html.py
-python3 scripts/generate_canvas.py
-
-# 3. Open the board
-open dist/index.html        # macOS
-# xdg-open dist/index.html  # Linux
+python3 scripts/configure.py
 ```
 
-Refresh anytime by re-running step 2.
+What it does:
+
+1. Signs in as you (`gh api user`)
+2. Lists Projects on **your user** and **your orgs**
+3. Asks you to pick one
+4. Asks which repos to scan for issues assigned to you
+5. Optionally asks for a Project **Area** filter
+6. Writes **`boards.json`** (local only — gitignored)
+
+Example session:
+
+```text
+Signed in as your-login
+Discovering GitHub Projects you can access…
+
+  Checking your-login…
+  Checking my-org…
+
+Found 3 project(s):
+
+    1. my-org #12 — Platform backlog
+       https://github.com/orgs/my-org/projects/12
+    2. my-org #4 — Team board
+       https://github.com/orgs/my-org/projects/4
+    3. your-login #1 — Personal
+       https://github.com/users/your-login/projects/1
+
+Select a project [1–3]: 2
+Board title [Team board — Cycle Time]:
+Repositories to scan for issues assigned to you (comma-separated owner/name).
+Example: acme/web-app, acme/api
+> my-org/frontend, my-org/api
+Area filter:
+
+Wrote boards.json
+Next:
+  python3 scripts/fetch.py
+  python3 scripts/generate_html.py
+  open dist/index.html
+```
+
+Prefer hand-editing? Copy `boards.example.json` → `boards.json`.
+
+### 4. Fetch your issues and open the board
+
+```bash
+python3 scripts/fetch.py
+python3 scripts/generate_html.py
+python3 scripts/generate_canvas.py   # optional, for Cursor
+
+open dist/index.html                 # macOS
+# xdg-open dist/index.html           # Linux
+```
 
 ---
 
-## Optional configuration
+## Day-to-day
 
-Built-in defaults target Kuadrant Project #18 / `kuadrant-console-plugin`.  
-Only create/edit `boards.json` if you need a **different project or repo** (copy from `boards.example.json`).
+| Goal | Command |
+| ---- | ------- |
+| Refresh data + HTML | `python3 scripts/fetch.py && python3 scripts/generate_html.py` |
+| Switch to another Project | `python3 scripts/configure.py` (overwrites `boards.json`) |
+| Someone else’s assignments | `python3 scripts/fetch.py --person their-login` |
+
+---
+
+## `boards.json` shape
+
+Created by configure (not committed). Example:
 
 ```json
 {
-  "title": "UI Touch Grass — Cycle Time",
+  "title": "My Team — Cycle Time",
   "project": {
-    "owner": "Kuadrant",
-    "number": 18,
-    "url": "https://github.com/orgs/Kuadrant/projects/18",
-    "area": "UI Touch Grass"
+    "owner": "my-org-or-username",
+    "number": 1,
+    "url": "https://github.com/orgs/my-org-or-username/projects/1"
   },
-  "repos": ["Kuadrant/kuadrant-console-plugin"]
+  "repos": ["my-org/my-repo"]
 }
 ```
 
-`person` is optional. If present it is only used as a fallback when auth is unavailable, or with `--no-auth`.
-
-```bash
-# Fetch someone else’s assigned issues (override)
-python3 scripts/fetch.py --person other-login
-```
+| Field | Required | Notes |
+| ----- | -------- | ----- |
+| `project.owner` + `project.number` | Yes | Which GitHub Project |
+| `repos` | Yes | `owner/name` list scanned for **your** assigned issues |
+| `project.area` | No | If set, keep only items with that Project Area |
+| `project.url` | No | Used in the board subtitle link |
+| `person` | No | Offline fallback only; auth wins by default |
 
 ---
 
-## Install in Cursor (optional)
-
-GitHub MCP is **not** required.
+## Cursor (optional)
 
 ```bash
-# Personal skill
 mkdir -p ~/.cursor/skills/cycle-time-board
 cp SKILL.md ~/.cursor/skills/cycle-time-board/SKILL.md
 ln -sfn "$(pwd)" ~/.cursor/skills/cycle-time-board-pkg
 
-# Canvas into a workspace
 python3 scripts/generate_canvas.py
 mkdir -p ~/.cursor/projects/<your-workspace>/canvases
 cp dist/cycle-time-board.canvas.tsx \
   ~/.cursor/projects/<your-workspace>/canvases/cycle-time-board.canvas.tsx
 ```
 
-In Cursor chat (with `gh` already authenticated in that environment):
+In chat (with `gh` working in the terminal):
 
 > Using the cycle-time-board skill, refresh the board from GitHub and regenerate the HTML + canvas.
 
@@ -142,7 +196,8 @@ In Cursor chat (with `gh` already authenticated in that environment):
 
 | Command | Purpose |
 | ------- | ------- |
-| `python3 scripts/fetch.py` | Resolve you via `gh`/`GH_TOKEN`, fetch issues → `data/people/<login>.json` |
+| `python3 scripts/configure.py` | Pick a Project → write `boards.json` |
+| `python3 scripts/fetch.py` | Fetch your issues → `data/people/<login>.json` |
 | `python3 scripts/generate_html.py` | Build `dist/index.html` |
 | `python3 scripts/generate_canvas.py` | Build `dist/cycle-time-board.canvas.tsx` |
 
@@ -150,19 +205,20 @@ In Cursor chat (with `gh` already authenticated in that environment):
 
 ## Sharing
 
-- **Snapshot:** share `dist/index.html` (self-contained; viewers need no GitHub auth).
-- **Tool:** share this repo; each person authenticates as themselves and runs fetch + generate.
+- **Snapshot:** send `dist/index.html` — viewers need no GitHub auth.
+- **Tool:** share this repo. Each person authenticates, runs **configure** for their own board, then fetch + generate.
 
 ---
 
 ## Troubleshooting
 
-| Problem | What to try |
-| ------- | ----------- |
-| Auth errors | `gh auth login` or set `GH_TOKEN`; for orgs authorize SSO on the token |
-| Empty board | Issues must be **assigned to your user**; check Project Area filter in defaults |
-| Wrong user | `gh api user --jq .login` — that login is whose board is fetched |
-| Cursor refresh fails | Ensure the integrated terminal can run `gh auth status` (MCP not used) |
+| Problem | Fix |
+| ------- | --- |
+| `No boards.json` / no Project selected | `python3 scripts/configure.py` |
+| Auth errors | `gh auth login` or set `GH_TOKEN`; authorize org SSO |
+| No Projects listed | Open the board in GitHub in a browser; token needs `read:project` (+ `read:org` / SSO) |
+| Empty board | Issues must be **assigned to you**; check `repos` and optional `area` |
+| Wrong user | `gh api user --jq .login` |
 
 ---
 

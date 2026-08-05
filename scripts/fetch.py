@@ -16,6 +16,8 @@ from config import (  # noqa: E402
     DATA_DIR,
     data_path_for,
     load_config,
+    require_project,
+    require_repos,
     resolve_person,
     run_gh_json,
 )
@@ -265,9 +267,10 @@ def load_existing(login: str) -> tuple[dict[int, dict], dict[int, dict]]:
 
 
 def fetch_person(login: str, name: str, cfg: dict) -> dict:
-    project_number = cfg["project"]["number"]
-    area_filter = cfg["project"].get("area")
-    repos = cfg.get("repos") or []
+    project = require_project(cfg)
+    project_number = project["number"]
+    area_filter = project.get("area")
+    repos = require_repos(cfg)
     issues_out = []
     existing_summaries, existing_meta = load_existing(login)
 
@@ -362,7 +365,7 @@ def main() -> int:
         "--boards",
         type=Path,
         default=BOARDS_PATH,
-        help="Optional boards.json overlay (project/repos). Not required.",
+        help="boards.json from scripts/configure.py",
     )
     parser.add_argument(
         "--no-auth",
@@ -371,7 +374,18 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    cfg = load_config(args.boards if args.boards.exists() else None)
+    if not args.boards.exists():
+        print(
+            "No boards.json found. Choose a Project first:\n"
+            "  python3 scripts/configure.py",
+            file=sys.stderr,
+        )
+        return 2
+
+    cfg = load_config(args.boards)
+    require_project(cfg)
+    require_repos(cfg)
+
     try:
         person = resolve_person(
             cfg,
@@ -383,7 +397,9 @@ def main() -> int:
         return 1
 
     login = person["login"]
+    project = cfg["project"]
     print(f"Authenticated board user: {login}", flush=True)
+    print(f"Project: {project['owner']} #{project['number']} — {cfg.get('title')}", flush=True)
     print(f"Fetching {login}…", flush=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     try:

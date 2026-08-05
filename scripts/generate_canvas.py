@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a Cursor .canvas.tsx matching the UI Touch Grass board (personal)."""
+"""Generate a Cursor .canvas.tsx cycle-time board (personal)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ from config import (  # noqa: E402
     DATA_DIR,
     data_path_for,
     load_config,
+    require_project,
+    require_repos,
     resolve_person,
 )
 
@@ -34,7 +36,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    cfg = load_config(args.boards if args.boards.exists() else None)
+    if not args.boards.exists():
+        raise SystemExit("No boards.json — run: python3 scripts/configure.py")
+
+    cfg = load_config(args.boards)
+    project = require_project(cfg)
+    repos = require_repos(cfg)
 
     login = None
     if args.person or not args.no_auth or (cfg.get("person") or {}).get("login"):
@@ -62,19 +69,29 @@ def main() -> int:
     issues = data.get("issues") or []
     fetched = (data.get("fetchedAt") or "")[:10] or "unknown"
 
-    clean = []
-    for issue in issues:
-        item = {k: v for k, v in issue.items() if v is not None}
-        clean.append(item)
+    clean = [{k: v for k, v in issue.items() if v is not None} for issue in issues]
 
     template = TEMPLATE.read_text()
-    if "__ISSUES__" not in template:
-        raise SystemExit("canvas template missing __ISSUES__ placeholder")
+    for key in (
+        "__ISSUES__",
+        "__FETCHED_AT__",
+        "__BOARD_TITLE__",
+        "__BOARD_REPOS__",
+        "__PROJECT_URL__",
+        "__PROJECT_NUMBER__",
+    ):
+        if key not in template:
+            raise SystemExit(f"canvas template missing {key} placeholder")
 
+    title = cfg.get("title") or "Cycle Time Board"
     canvas = (
         template
         .replace("__ISSUES__", json.dumps(clean, indent=2))
         .replace("__FETCHED_AT__", fetched)
+        .replace("__BOARD_TITLE__", title)
+        .replace("__BOARD_REPOS__", ", ".join(repos) or project["owner"])
+        .replace("__PROJECT_URL__", project.get("url") or "#")
+        .replace("__PROJECT_NUMBER__", str(project["number"]))
     )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

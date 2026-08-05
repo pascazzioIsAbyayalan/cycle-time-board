@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared defaults + GitHub identity resolution (via gh / GH_TOKEN)."""
+"""Shared config + GitHub identity resolution (via gh / GH_TOKEN)."""
 
 from __future__ import annotations
 
@@ -14,21 +14,16 @@ BOARDS_PATH = ROOT / "boards.json"
 EXAMPLE_PATH = ROOT / "boards.example.json"
 DATA_DIR = ROOT / "data" / "people"
 
-DEFAULT_CONFIG = {
-    "title": "UI Touch Grass — Cycle Time",
-    "project": {
-        "owner": "Kuadrant",
-        "number": 18,
-        "url": "https://github.com/orgs/Kuadrant/projects/18",
-        "area": "UI Touch Grass",
-    },
-    "repos": ["Kuadrant/kuadrant-console-plugin"],
+# No project is selected by default — run scripts/configure.py first.
+DEFAULT_CONFIG: dict = {
+    "title": "Cycle Time Board",
+    "project": None,
+    "repos": [],
 }
 
 
 def run_gh_json(args: list[str]) -> dict | list:
     env = os.environ.copy()
-    # Prefer explicit token env vars; gh also reads GH_TOKEN
     token = env.get("GH_TOKEN") or env.get("GITHUB_TOKEN")
     if token and "GH_TOKEN" not in env:
         env["GH_TOKEN"] = token
@@ -43,6 +38,8 @@ def run_gh_json(args: list[str]) -> dict | list:
         )
         detail = (r.stderr or r.stdout or "gh failed").strip()
         raise RuntimeError(f"{detail}\n\n{hint}")
+    if not r.stdout.strip():
+        return {}
     return json.loads(r.stdout)
 
 
@@ -55,17 +52,48 @@ def github_viewer() -> dict:
 
 
 def load_config(boards_path: Path | None = None) -> dict:
-    """Merge optional boards.json over built-in defaults. person is optional."""
-    cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
+    """Load boards.json (required for project selection)."""
+    cfg = json.loads(json.dumps(DEFAULT_CONFIG))
     path = boards_path or BOARDS_PATH
-    if path.exists():
+    if path and path.exists():
         overlay = json.loads(path.read_text())
         for key, value in overlay.items():
             if key == "project" and isinstance(value, dict):
-                cfg.setdefault("project", {}).update(value)
+                base = cfg.get("project") if isinstance(cfg.get("project"), dict) else {}
+                merged = {**(base or {}), **value}
+                cfg["project"] = merged
             else:
                 cfg[key] = value
     return cfg
+
+
+def require_project(cfg: dict) -> dict:
+    """Return project dict or exit with setup instructions."""
+    project = cfg.get("project")
+    if not isinstance(project, dict) or not project.get("owner") or not project.get("number"):
+        print(
+            "No GitHub Project selected yet.\n\n"
+            "Pick a board you have access to:\n"
+            "  python3 scripts/configure.py\n\n"
+            "That writes boards.json (owner, project number, repos).\n"
+            "See boards.example.json for the file shape.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return project
+
+
+def require_repos(cfg: dict) -> list[str]:
+    repos = cfg.get("repos") or []
+    if not repos:
+        print(
+            "No repositories configured in boards.json.\n"
+            "Re-run: python3 scripts/configure.py\n"
+            "or add a \"repos\": [\"owner/name\"] list to boards.json.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return list(repos)
 
 
 def resolve_person(
@@ -94,7 +122,6 @@ def resolve_person(
             }
         except RuntimeError:
             if cfg.get("person", {}).get("login"):
-                # Fall back to config if auth unavailable
                 p = cfg["person"]
                 return {"login": p["login"], "name": p.get("name") or p["login"]}
             raise
@@ -112,3 +139,9 @@ def resolve_person(
 
 def data_path_for(login: str) -> Path:
     return DATA_DIR / f"{login}.json"
+
+
+def save_config(cfg: dict, path: Path | None = None) -> Path:
+    out = path or BOARDS_PATH
+    out.write_text(json.dumps(cfg, indent=2) + "\n")
+    return out

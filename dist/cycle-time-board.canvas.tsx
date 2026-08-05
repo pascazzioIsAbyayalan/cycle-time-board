@@ -585,10 +585,9 @@ export default function UITouchGrassBoard() {
 
   const dispatch = useCanvasAction();
   const REFRESH_PROMPT =
-    "Please re-fetch the latest issue data for the UI Touch Grass board " +
-    "(Kuadrant/kuadrant-console-plugin, GitHub Projects #18) and update the " +
-    "ui-touch-grass-board canvas with current statuses, any new PRs, " +
-    "updated cycle times, and any new or closed issues.";
+    "Using the cycle-time-board skill, refresh my personal board from GitHub " +
+    "(python3 scripts/fetch.py && generate_html.py && generate_canvas.py) " +
+    "and update the canvas with current statuses, PRs, and cycle times.";
 
   const inputBase = {
     display: "block" as const, width: "100%", boxSizing: "border-box" as const,
@@ -619,10 +618,10 @@ export default function UITouchGrassBoard() {
       {/* Header */}
       <Row align="center" style={{ background: themeMode === "dark" ? "#3a2f52" : P.lavender, borderRadius: 10, padding: "16px 20px", marginBottom: -8 }}>
         <Stack gap={2} style={{ flex: 1 }}>
-          <H1 style={{ color: themeMode === "dark" ? "#ececec" : P.charcoal }}>UI Touch Grass — Cycle Time</H1>
+          <H1 style={{ color: themeMode === "dark" ? "#ececec" : P.charcoal }}>Example — Cycle Time</H1>
           <Text tone="secondary" size="small" style={{ color: P.grey }}>
-            Kuadrant / kuadrant-console-plugin · Sprints 37–38 ·{" "}
-            <Link href="https://github.com/orgs/Kuadrant/projects/18">Project #18</Link>
+            example-org/example-repo ·{" "}
+            <Link href="https://github.com/orgs/example-org/projects/1">Project #1</Link>
             {" "}· Last fetched 2026-08-05
           </Text>
         </Stack>

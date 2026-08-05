@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build standalone HTML matching the UI Touch Grass board (personal)."""
+"""Build standalone HTML cycle-time board (personal)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ from config import (  # noqa: E402
     DATA_DIR,
     data_path_for,
     load_config,
+    require_project,
+    require_repos,
     resolve_person,
 )
 
@@ -34,7 +36,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    cfg = load_config(args.boards if args.boards.exists() else None)
+    if not args.boards.exists():
+        raise SystemExit("No boards.json — run: python3 scripts/configure.py")
+
+    cfg = load_config(args.boards)
+    project = require_project(cfg)
+    repos = require_repos(cfg)
 
     login = None
     name = None
@@ -50,7 +57,6 @@ def main() -> int:
             login = None
 
     if not login:
-        # Offline: use sole / newest snapshot in data/people
         files = sorted(DATA_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not files:
             raise SystemExit("No data found. Run: python3 scripts/fetch.py")
@@ -62,8 +68,9 @@ def main() -> int:
 
     data = json.loads(data_path.read_text())
     payload = {
-        "title": cfg.get("title") or "UI Touch Grass — Cycle Time",
-        "project": cfg["project"],
+        "title": cfg.get("title") or "Cycle Time Board",
+        "project": project,
+        "repos": repos,
         "person": {
             "login": login,
             "name": name or data.get("name") or login,

@@ -1,10 +1,10 @@
 {
-  "title": "UI Touch Grass — Cycle Time",
+  "title": "My Team — Cycle Time",
   "project": {
-    "owner": "Kuadrant",
-    "number": 18,
-    "url": "https://github.com/orgs/Kuadrant/projects/18",
-    "area": "UI Touch Grass"
+    "owner": "my-org-or-username",
+    "number": 1,
+    "url": "https://github.com/orgs/my-org-or-username/projects/1",
+    "area": null
   },
-  "repos": ["Kuadrant/kuadrant-console-plugin"]
+  "repos": ["my-org/my-repo"]
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>UI Touch Grass — Cycle Time</title>
+  <title>Cycle Time Board</title>
   <style>
     :root, [data-theme="light"] {
       --blush: #fff0f8;
@@ -284,7 +284,7 @@
   <div class="wrap">
     <header class="header">
       <div>
-        <h1 id="title">UI Touch Grass — Cycle Time</h1>
+        <h1 id="title">Cycle Time Board</h1>
         <p class="sub" id="subtitle"></p>
       </div>
       <div class="header-actions">
@@ -747,8 +747,10 @@
       const avgPR = done.length ? done.reduce((s, i) => s + (i.prOpenHours || 0), 0) / done.length : null;
 
       document.getElementById("title").textContent = BOARD.title;
+      document.title = BOARD.title;
+      const repos = (BOARD.repos || []).join(", ") || BOARD.project.owner;
       document.getElementById("subtitle").innerHTML =
-        `Kuadrant / kuadrant-console-plugin · Sprints 37–38 · <a href="${BOARD.project.url}" target="_blank" rel="noopener">Project #${BOARD.project.number}</a> · Last fetched ${fmtDate(BOARD.fetchedAt)}`;
+        `${repos} · <a href="${BOARD.project.url}" target="_blank" rel="noopener">Project #${BOARD.project.number}</a> · Last fetched ${fmtDate(BOARD.fetchedAt)}`;
 
       document.getElementById("stats").innerHTML = [
         [ISSUES.length, "Issues assigned"],
