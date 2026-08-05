@@ -1,156 +1,97 @@
-# Cycle Time Board
+## Description
 
-Personal cycle-time board for **your** GitHub Project issues — as a static HTML page or a Cursor canvas.
+Personal **cycle-time board** for the GitHub Project issues assigned to you. Perfect if you want a clear view of your open work, cycle times, and PR summaries — without living inside the Project board all day.
 
-## Important: you choose the board
+You pick which Project(s) and repos to follow. There is **no default board** (nothing is hard-coded to a specific org).
 
-This package ships **without** a default Project (nothing is pre-pointed at Kuadrant or any other org).
+#### How does it work?
 
-| Step | What happens |
-| ---- | ------------ |
-| 1. Authenticate | GitHub knows who you are (`gh` or `GH_TOKEN`) |
-| 2. **Choose a board** | `configure.py` opens a **browser UI** to pick a Project + repos |
-| 3. Fetch & build | Scripts pull **your** assigned issues and write HTML / canvas |
+1. You sign in with GitHub (`gh` / token).
+2. A small **browser UI** lists Projects from your user + orgs you can access.
+3. You multi-select Projects, pick repos from a searchable dropdown, then **Save and build**.
+4. That writes a local snapshot: HTML board (+ optional Cursor canvas) with stats, filters, cycle timelines, and PR solution summaries parsed from your PR descriptions.
 
-Until you run step 2, fetch/generate will stop and tell you to configure.
-
-```text
-clone  →  configure.py (browser)  →  Save and build  →  open dist/index.html
-           login + pick Project         fetch + HTML
-```
-
----
-
-## What you get
-
-- Summary stats + interactive label donut
-- Search / date / label / sprint filters
-- **Cycle time** view (Open / Completed, timelines, PR summaries from each PR’s description)
-- **Board** and **Sprint** views
-- Light / dark mode
-
-| Output | File |
-| ------ | ---- |
-| Browser (no server) | `dist/index.html` |
+| Output | Where |
+| ------ | ----- |
+| Board in the browser | `dist/index.html` or http://127.0.0.1:8765/board while configure is running |
 | Cursor canvas | `dist/cycle-time-board.canvas.tsx` |
 
-**GitHub MCP is not required.** Scripts use the `gh` CLI (or `GH_TOKEN`). The HTML file never calls GitHub from the browser.
+GitHub MCP is **not** required. Scripts talk to GitHub through the `gh` CLI.
 
----
+## Installation
 
-## Prerequisites
-
-| Need | Why |
-| ---- | --- |
-| Python 3 | Runs the scripts |
-| [GitHub CLI](https://cli.github.com/) **or** `GH_TOKEN` | Auth + API |
-| Access to a GitHub Project and its repos | You select these in configure |
-| Cursor *(optional)* | Skill + canvas only |
-
----
-
-## Setup (first time)
-
-### 1. Clone
+Anyone can use it by cloning the repo. You’ll need **Python 3** and the [GitHub CLI](https://cli.github.com/) (`gh`).
 
 ```bash
 git clone https://github.com/pascazzioIsAbyayalan/cycle-time-board.git
 cd cycle-time-board
+
+# (once) sign in to GitHub if you haven’t already
+gh auth login
 ```
 
-### 2. Choose your Project board (browser UI)
+### First-time setup (new version — browser UI)
 
 ```bash
 python3 scripts/configure.py
 ```
 
-This starts a local page (like `gh auth login`) and opens it in your browser:
+That opens a local page (same idea as `gh auth login`):
 
-1. **Login with GitHub** if needed (same `gh auth login --web` flow; watch the terminal for a one-time code)
-2. **Pick one or more Projects** from your user account and orgs (multi-select)
-3. **Choose repositories** from a searchable dropdown (GitHub-style switcher) for those Project owners
-4. Optional **Area** filter and board title
-5. Click **Save and build board** (writes `boards.json`, runs fetch + generate, opens the HTML)
+1. **Login with GitHub** if the UI says you’re not signed in (watch the terminal for a one-time code).
+2. **Select one or more Projects**.
+3. Open **Switch repositories**, search, and check the repos you care about.
+4. Optional: title + Area filter.
+5. Click **Save and build board**.
 
-On the generated board, use the **Repository** filter to switch which of your selected repos you are looking at.
+Leave that terminal open while you use the UI (`Ctrl+C` to stop).
 
-Leave the terminal running while you use the UI (`Ctrl+C` to stop).
+Your choices are saved locally in `boards.json` (gitignored — not committed).
 
-| Alternative | Command |
-| ----------- | ------- |
-| Terminal prompts (old flow) | `python3 scripts/configure.py --cli` |
-| UI without auto-opening a tab | `python3 scripts/configure.py --no-browser` then visit the printed URL |
-| Hand-edit config | Copy `boards.example.json` → `boards.json` |
+### Open the board
 
-Or authenticate ahead of time / via token:
+While configure is still running:
 
-```bash
-gh auth login
-# or:
-export GH_TOKEN=ghp_xxxxxxxxxxxxxxxx   # needs repo, read:project, read:org (+ SSO if required)
+```text
+http://127.0.0.1:8765/board
 ```
 
-### 3. Refresh later / Cursor canvas
+Or open the static file anytime:
+
+```bash
+open dist/index.html        # macOS
+# xdg-open dist/index.html  # Linux
+```
+
+### Keep it up to date
+
+On the board itself:
+
+- **Sync with GitHub** — fetch + regenerate now  
+- **Auto-sync** — every 5 minutes while the page stays open  
+
+(Both need `python3 scripts/configure.py` still running in a terminal.)
+
+Or from the CLI:
 
 ```bash
 python3 scripts/fetch.py
 python3 scripts/generate_html.py
-python3 scripts/generate_canvas.py   # optional, for Cursor
-
-open dist/index.html                 # macOS
-# xdg-open dist/index.html           # Linux
 ```
 
----
+### Updating from an older clone
 
-## Day-to-day
+If you already cloned this repo before the configure UI:
 
-| Goal | How |
-| ---- | --- |
-| **Sync from the board** | Keep `python3 scripts/configure.py` running, open [http://127.0.0.1:8765/board](http://127.0.0.1:8765/board), click **Sync with GitHub** (optional **Auto-sync** every 5 minutes) |
-| Refresh via CLI | `python3 scripts/fetch.py && python3 scripts/generate_html.py` |
-| Switch Projects / repos | `python3 scripts/configure.py` (browser UI; overwrites `boards.json`) |
-| Someone else’s assignments | `python3 scripts/fetch.py --person their-login` |
-
-The HTML file itself cannot call GitHub from the browser. Sync works through the local configure server (`/api/refresh`), which uses your `gh` login.
-
----
-
-## `boards.json` shape
-
-Created by configure (not committed). Example:
-
-```json
-{
-  "title": "My Teams — Cycle Time",
-  "projects": [
-    {
-      "owner": "my-org",
-      "number": 1,
-      "url": "https://github.com/orgs/my-org/projects/1",
-      "title": "Team board"
-    }
-  ],
-  "project": {
-    "owner": "my-org",
-    "number": 1,
-    "url": "https://github.com/orgs/my-org/projects/1"
-  },
-  "repos": ["my-org/my-repo", "my-org/another-repo"]
-}
+```bash
+cd cycle-time-board
+git pull
+python3 scripts/configure.py
 ```
 
-| Field | Required | Notes |
-| ----- | -------- | ----- |
-| `projects[]` | Yes* | One or more GitHub Projects (`owner` + `number`) |
-| `project` | Legacy | Still written as the first selected Project for older tools |
-| `repos` | Yes | `owner/name` list scanned for **your** assigned issues |
-| `projects[].area` / shared area | No | If set, prefer items with that Project Area |
-| `person` | No | Offline fallback only; auth wins by default |
+Then use **Save and build** again so your board matches the new multi-project / sync flow.
 
----
-
-## Cursor (optional)
+### Optional: Cursor skill + canvas
 
 ```bash
 mkdir -p ~/.cursor/skills/cycle-time-board
@@ -158,49 +99,33 @@ cp SKILL.md ~/.cursor/skills/cycle-time-board/SKILL.md
 ln -sfn "$(pwd)" ~/.cursor/skills/cycle-time-board-pkg
 
 python3 scripts/generate_canvas.py
-mkdir -p ~/.cursor/projects/<your-workspace>/canvases
-cp dist/cycle-time-board.canvas.tsx \
-  ~/.cursor/projects/<your-workspace>/canvases/cycle-time-board.canvas.tsx
+# copy dist/cycle-time-board.canvas.tsx into your workspace canvases/ folder
 ```
 
-In chat (with `gh` working in the terminal):
+In Cursor chat:
 
 > Using the cycle-time-board skill, refresh the board from GitHub and regenerate the HTML + canvas.
 
----
+## Recomendations
 
-## Scripts
-
-| Command | Purpose |
-| ------- | ------- |
-| `python3 scripts/configure.py` | Open browser UI → pick Project → write `boards.json` (optional build) |
-| `python3 scripts/configure.py --cli` | Same setup via terminal prompts |
-| `python3 scripts/fetch.py` | Fetch your issues → `data/people/<login>.json` |
-| `python3 scripts/generate_html.py` | Build `dist/index.html` |
-| `python3 scripts/generate_canvas.py` | Build `dist/cycle-time-board.canvas.tsx` |
-
----
-
-## Sharing
-
-- **Snapshot:** send `dist/index.html` — viewers need no GitHub auth.
-- **Tool:** share this repo. Each person authenticates, runs **configure** for their own board, then fetch + generate.
-
----
+- Prefer opening the board at **http://127.0.0.1:8765/board** so **Sync** and **Auto-sync** work.
+- Only issues **assigned to you** show up — check assignees on GitHub if the board looks empty.
+- Pick the repos that actually hold your issues; more repos = slower first fetch.
+- For org Projects, authorize SSO on your token if GitHub asks.
+- Prefer terminal prompts instead of the UI? `python3 scripts/configure.py --cli`
+- Tweak it to your preference 👾
 
 ## Troubleshooting
 
-| Problem | Fix |
-| ------- | --- |
-| `No boards.json` / no Project selected | `python3 scripts/configure.py` |
-| Auth errors | `gh auth login` or set `GH_TOKEN`; authorize org SSO |
-| No Projects listed | Open the board in GitHub in a browser; token needs `read:project` (+ `read:org` / SSO) |
-| Empty board | Issues must be **assigned to you**; check `repos` and optional `area` |
-| No PR Solution Summary | Fetch builds summaries from the **PR description** (`## Description`, `## Changes made`, type checkboxes). Empty/template-only PR bodies produce no summary. Re-run `python3 scripts/fetch.py` after this fix. |
+| Problem | What to try |
+| ------- | ----------- |
+| Sync button disabled | Run `python3 scripts/configure.py` and open the board via http://127.0.0.1:8765/board |
+| No Projects listed | Confirm you can open the Project in GitHub; token needs `read:project` (+ `read:org` / SSO) |
+| Empty board | Issues must be assigned to **your** login; check selected repos |
+| No PR Solution Summary | Fill in the PR description (`## Description`, `## Changes made`, etc.), then Sync again |
 | Wrong user | `gh api user --jq .login` |
 
----
+## Sharing
 
-## License
-
-Use and share freely within your team unless a LICENSE file is added later.
+- Send someone `dist/index.html` for a snapshot (no GitHub auth needed to view).
+- Share this repo so teammates can configure **their own** board the same way.
