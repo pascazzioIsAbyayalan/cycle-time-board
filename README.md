@@ -2,7 +2,7 @@
 
 Personal **cycle-time board** for the GitHub Project issues assigned to you. Perfect if you want a clear view of your open work, cycle times, and PR summaries — without living inside the Project board all day.
 
-You pick which Project(s) and repos to follow. There is **no default board** (nothing is hard-coded to a specific org).
+You pick which Project(s) and repos to follow. 
 
 #### How does it work?
 
@@ -30,8 +30,7 @@ cd cycle-time-board
 gh auth login
 ```
 
-### First-time setup (new version — browser UI)
-
+### First-time setup
 ```bash
 python3 scripts/configure.py
 ```
