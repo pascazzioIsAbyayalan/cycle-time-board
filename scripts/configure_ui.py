@@ -179,7 +179,9 @@ class ConfigureHandler(BaseHTTPRequestHandler):
     server_version = "CycleTimeConfigure/1.0"
 
     def log_message(self, fmt: str, *args) -> None:
-        sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+        msg = fmt % args
+        if " 4" in msg or " 5" in msg:
+            sys.stderr.write("%s - %s\n" % (self.address_string(), msg))
 
     def _cors(self) -> None:
         # Allow the static board (file:// or another port) to call sync APIs.
