@@ -210,24 +210,29 @@
       color: var(--grey); white-space: nowrap;
     }
     .chip.hot { color: var(--grey); background: color-mix(in srgb, var(--lavender) 40%, var(--surface)); }
-    .bar-wrap { position: relative; margin: 8px 0 6px; }
+    .bar-wrap { position: relative; margin: 8px 0 6px; overflow: hidden; }
     .bar {
-      height: 10px; border-radius: 5px; display: flex; overflow: visible;
+      position: relative; height: 10px; border-radius: 5px; display: flex; overflow: hidden;
       background: color-mix(in srgb, var(--blush-border) 50%, var(--surface));
     }
-    .bar .seg-todo { background: var(--lavender); border-radius: 5px 0 0 5px; }
-    .bar .seg-ip { background: var(--amber); }
-    .bar .seg-review { background: var(--mint-deep); border-radius: 0 5px 5px 0; }
+    .bar .seg-todo { background: var(--lavender); border-radius: 5px 0 0 5px; min-width: 0; }
+    .bar .seg-ip { background: var(--amber); min-width: 0; }
+    .bar .seg-review { background: var(--mint-deep); border-radius: 0 5px 5px 0; min-width: 0; }
     .bar-marker {
       position: absolute; top: -3px; bottom: -3px; width: 2px;
-      background: var(--amber); border-radius: 1px;
+      background: var(--amber); border-radius: 1px; pointer-events: none;
     }
     .bar-phase {
-      position: relative; height: 36px; font-size: 9px; color: var(--grey); margin-bottom: 4px;
+      position: relative; height: 40px; font-size: 9px; color: var(--grey); margin-bottom: 4px;
+      overflow: hidden;
     }
-    .bar-phase .left { position: absolute; left: 0; display: flex; flex-direction: column; }
-    .bar-phase .mid { position: absolute; display: flex; flex-direction: column; }
-    .bar-phase .right { position: absolute; right: 0; display: flex; flex-direction: column; align-items: flex-end; }
+    .bar-phase .left { position: absolute; left: 0; max-width: 42%; display: flex; flex-direction: column; }
+    .bar-phase .mid {
+      position: absolute; max-width: 42%; display: flex; flex-direction: column;
+      white-space: nowrap;
+    }
+    .bar-phase .mid.edge-end { right: 0; left: auto; align-items: flex-end; }
+    .bar-phase .right { position: absolute; right: 0; max-width: 36%; display: flex; flex-direction: column; align-items: flex-end; }
     .bar-phase strong { font-weight: 600; color: var(--charcoal); }
     .bar-phase .ip-lab { font-weight: 600; color: var(--amber); }
     .bar-phase .merged { font-weight: 500; color: var(--mint-deep); }
@@ -568,37 +573,73 @@
 
     function timelineBar(issue) {
       const todoMs = new Date(issue.todoAt || issue.assignedAt).getTime();
-      const inProgMs = issue.inProgressAt ? new Date(issue.inProgressAt).getTime() : null;
+      // Board "In Progress" can predate Todo/assignment — clamp so bar math never goes negative.
+      const rawInProg = issue.inProgressAt ? new Date(issue.inProgressAt).getTime() : null;
+      const inProgMs = rawInProg != null ? Math.max(rawInProg, todoMs) : null;
       const prMs = issue.prCreatedAt ? new Date(issue.prCreatedAt).getTime() : null;
       const mergedMs = issue.mergedAt ? new Date(issue.mergedAt).getTime() : null;
       const endMs = mergedMs || Date.now();
       const total = Math.max(endMs - todoMs, 1);
-      const todoPct = inProgMs ? ((inProgMs - todoMs) / total) * 100 : 100;
-      const inProgEnd = prMs || mergedMs || Date.now();
-      const inProgPct = inProgMs ? ((inProgEnd - inProgMs) / total) * 100 : 0;
-      const reviewPct = prMs && mergedMs ? ((mergedMs - prMs) / total) * 100 : 0;
-      const todoHrs = inProgMs ? (inProgMs - todoMs) / 3600000 : (endMs - todoMs) / 3600000;
-      const inProgHrs = inProgMs ? (inProgEnd - inProgMs) / 3600000 : 0;
-      const reviewHrs = prMs && mergedMs ? (mergedMs - prMs) / 3600000 : 0;
+
+      let todoPct = inProgMs != null ? ((inProgMs - todoMs) / total) * 100 : 100;
+      const inProgEnd = Math.max(prMs || mergedMs || Date.now(), inProgMs || todoMs);
+      let inProgPct = inProgMs != null ? ((inProgEnd - inProgMs) / total) * 100 : 0;
+      let reviewPct = prMs && mergedMs
+        ? ((mergedMs - Math.max(prMs, inProgMs || prMs)) / total) * 100
+        : 0;
+
+      todoPct = Math.max(0, Math.min(100, todoPct));
+      inProgPct = Math.max(0, Math.min(100 - todoPct, inProgPct));
+      reviewPct = Math.max(0, Math.min(100 - todoPct - inProgPct, reviewPct));
+
+      const todoHrs = inProgMs != null
+        ? Math.max(0, (inProgMs - todoMs) / 3600000)
+        : (endMs - todoMs) / 3600000;
+      const inProgHrs = inProgMs != null ? Math.max(0, (inProgEnd - inProgMs) / 3600000) : 0;
+      const reviewHrs = prMs && mergedMs ? Math.max(0, (mergedMs - prMs) / 3600000) : 0;
+
+      // Keep the ▶ In Progress label inside the card (edges overflow when near 0% / 100%).
+      const showMid = inProgMs != null && todoPct > 2 && todoPct < 88;
+      let midClass = "mid";
+      let midStyle = "";
+      if (showMid) {
+        if (todoPct >= 70) {
+          midClass += " edge-end";
+        } else {
+          // Nudge past the Todo column when the transition is early in the bar.
+          midStyle = `left:${Math.max(todoPct, 28)}%`;
+        }
+      }
+      // When transition is at the start, promote In Progress to the left label.
+      const leftIsIp = inProgMs != null && todoPct <= 2;
+      const leftHtml = leftIsIp
+        ? `<span class="left"><span class="ip-lab">▶ In Progress</span><span>${fmtDate(issue.inProgressAt)}</span><span>${fmtHours(inProgHrs)}</span></span>`
+        : `<span class="left"><strong>Todo</strong><span>${fmtDate(issue.todoAt || issue.assignedAt)}</span><span>${fmtHours(todoHrs)}</span></span>`;
+      const midHtml = showMid
+        ? `<span class="${midClass}" style="${midStyle}"><span class="ip-lab">▶ In Progress</span><span>${fmtDate(issue.inProgressAt)}</span>${inProgHrs > 0 ? `<span>${fmtHours(inProgHrs)}</span>` : ""}</span>`
+        : "";
+      const markerHtml = inProgMs != null && todoPct > 0.5 && todoPct < 99.5
+        ? `<div class="bar-marker" style="left:${todoPct}%"></div>`
+        : "";
 
       return `<div class="bar-wrap">
         <div class="bar">
-          <div class="seg-todo" style="width:${todoPct}%;${inProgMs ? "" : "border-radius:5px"}" title="Todo: ${fmtHours(todoHrs)}"></div>
-          ${inProgPct > 0 ? `<div class="seg-ip" style="width:${inProgPct}%" title="In Progress: ${fmtHours(inProgHrs)}"></div>` : ""}
-          ${reviewPct > 0 ? `<div class="seg-review" style="width:${reviewPct}%" title="Review: ${fmtHours(reviewHrs)}"></div>` : ""}
-          ${inProgMs ? `<div class="bar-marker" style="left:${todoPct}%"></div>` : ""}
+          ${todoPct > 0.5 ? `<div class="seg-todo" style="width:${todoPct}%;${!inProgMs ? "border-radius:5px" : ""}" title="Todo: ${fmtHours(todoHrs)}"></div>` : ""}
+          ${inProgPct > 0.5 ? `<div class="seg-ip" style="width:${inProgPct}%;${todoPct <= 0.5 && reviewPct <= 0.5 ? "border-radius:5px" : todoPct <= 0.5 ? "border-radius:5px 0 0 5px" : ""}" title="In Progress: ${fmtHours(inProgHrs)}"></div>` : ""}
+          ${reviewPct > 0.5 ? `<div class="seg-review" style="width:${reviewPct}%" title="Review: ${fmtHours(reviewHrs)}"></div>` : ""}
+          ${markerHtml}
         </div>
         <div class="bar-phase">
-          <span class="left"><strong>Todo</strong><span>${fmtDate(issue.todoAt || issue.assignedAt)}</span><span>${fmtHours(todoHrs)}</span></span>
-          ${inProgMs ? `<span class="mid" style="left:calc(${todoPct}% + 4px)"><span class="ip-lab">▶ In Progress</span><span>${fmtDate(issue.inProgressAt)}</span>${inProgHrs > 0 ? `<span>${fmtHours(inProgHrs)}</span>` : ""}</span>` : ""}
+          ${leftHtml}
+          ${midHtml}
           <span class="right">${mergedMs
             ? `<span class="merged">Merged</span><span>${fmtDate(issue.mergedAt)}</span>${reviewHrs > 0 ? `<span>Review ${fmtHours(reviewHrs)}</span>` : ""}`
             : `<span style="font-style:italic">now…</span>`}</span>
         </div>
         <div class="legend">
-          <span><i class="swatch" style="background:var(--lavender)"></i>Todo</span>
+          ${todoPct > 0.5 ? `<span><i class="swatch" style="background:var(--lavender)"></i>Todo</span>` : ""}
           ${inProgMs ? `<span><i class="swatch" style="background:var(--amber)"></i>In Progress</span>` : ""}
-          ${reviewPct > 0 ? `<span><i class="swatch" style="background:var(--mint-deep)"></i>Review</span>` : ""}
+          ${reviewPct > 0.5 ? `<span><i class="swatch" style="background:var(--mint-deep)"></i>Review</span>` : ""}
         </div>
       </div>`;
     }
@@ -945,17 +986,22 @@
       return false;
     }
 
-    async function pollSync() {
+    async function pollSync(startedAt) {
+      let sawRunning = false;
       for (let i = 0; i < 600; i++) {
         const res = await fetch(syncBase + "/api/build", { cache: "no-store" });
         const b = await res.json();
-        if (b.running) {
+        const isThisRun =
+          !startedAt ||
+          (b.startedAt != null && Number(b.startedAt) >= Number(startedAt) - 0.001);
+        if (b.running && isThisRun) {
+          sawRunning = true;
           setSyncStatus("", b.message || "Syncing with GitHub…");
         }
-        if (b.done) {
+        // Only accept done after we've seen this run start (avoids stale done=true).
+        if (b.done && isThisRun && (sawRunning || b.stage === "done" || b.stage === "error")) {
           if (b.error) throw new Error(b.error);
           setSyncStatus("ok", "Synced. Reloading…");
-          // Prefer board URL from server when we are not already on /board
           const next = b.boardUrl || (syncBase + "/board");
           if (location.href.startsWith("http") && location.pathname.endsWith("/board")) {
             location.reload();
@@ -994,7 +1040,11 @@
         if (!start.ok && start.status !== 202) {
           throw new Error(data.error || ("Sync failed (" + start.status + ")"));
         }
-        await pollSync();
+        const startedAt =
+          (data.build && data.build.startedAt) != null
+            ? data.build.startedAt
+            : Date.now() / 1000;
+        await pollSync(startedAt);
       } catch (e) {
         setSyncStatus("error", e.message || String(e));
         btn.disabled = false;

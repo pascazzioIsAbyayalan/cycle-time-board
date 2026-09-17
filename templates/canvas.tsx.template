@@ -112,66 +112,75 @@ function TimelineBar({ issue }: { issue: Issue }) {
   const theme = useHostTheme();
   const NOW = new Date().toISOString();
 
-  const todoMs       = new Date(issue.todoAt).getTime();
-  const inProgMs     = issue.inProgressAt ? new Date(issue.inProgressAt).getTime() : null;
-  const prMs         = issue.prCreatedAt  ? new Date(issue.prCreatedAt).getTime()  : null;
-  const mergedMs     = issue.mergedAt     ? new Date(issue.mergedAt).getTime()     : null;
-  const nowMs        = new Date(NOW).getTime();
-  const endMs        = mergedMs ?? nowMs;
-  const totalMs      = endMs - todoMs;
+  const todoMs = new Date(issue.todoAt).getTime();
+  const rawInProg = issue.inProgressAt ? new Date(issue.inProgressAt).getTime() : null;
+  // Board "In Progress" can predate Todo/assignment — clamp so bar math never goes negative.
+  const inProgMs = rawInProg != null ? Math.max(rawInProg, todoMs) : null;
+  const prMs = issue.prCreatedAt ? new Date(issue.prCreatedAt).getTime() : null;
+  const mergedMs = issue.mergedAt ? new Date(issue.mergedAt).getTime() : null;
+  const nowMs = new Date(NOW).getTime();
+  const endMs = mergedMs ?? nowMs;
+  const totalMs = Math.max(endMs - todoMs, 1);
 
-  // Segment widths as percentages of total span
-  const todoPct   = inProgMs ? ((inProgMs - todoMs) / totalMs) * 100 : 100;
-  const inProgEnd = prMs ?? mergedMs ?? nowMs;
-  const inProgPct = inProgMs ? ((inProgEnd - inProgMs) / totalMs) * 100 : 0;
-  const reviewPct = (prMs && mergedMs) ? ((mergedMs - prMs) / totalMs) * 100 : 0;
+  let todoPct = inProgMs != null ? ((inProgMs - todoMs) / totalMs) * 100 : 100;
+  const inProgEnd = Math.max(prMs ?? mergedMs ?? nowMs, inProgMs ?? todoMs);
+  let inProgPct = inProgMs != null ? ((inProgEnd - inProgMs) / totalMs) * 100 : 0;
+  let reviewPct = (prMs && mergedMs)
+    ? ((mergedMs - Math.max(prMs, inProgMs ?? prMs)) / totalMs) * 100
+    : 0;
 
-  const todoHrs    = inProgMs ? (inProgMs - todoMs) / 3_600_000 : (endMs - todoMs) / 3_600_000;
-  const inProgHrs  = inProgMs ? (inProgEnd - inProgMs) / 3_600_000 : 0;
-  const reviewHrs  = (prMs && mergedMs) ? (mergedMs - prMs) / 3_600_000 : 0;
+  todoPct = Math.max(0, Math.min(100, todoPct));
+  inProgPct = Math.max(0, Math.min(100 - todoPct, inProgPct));
+  reviewPct = Math.max(0, Math.min(100 - todoPct - inProgPct, reviewPct));
 
-  // Colours — palette-mapped
-  const todoColor    = P.lavender;
-  const inProgColor  = "#f59e0b";   // amber — "in progress"
-  const reviewColor  = P.mintDeep;
+  const todoHrs = inProgMs != null
+    ? Math.max(0, (inProgMs - todoMs) / 3_600_000)
+    : (endMs - todoMs) / 3_600_000;
+  const inProgHrs = inProgMs != null ? Math.max(0, (inProgEnd - inProgMs) / 3_600_000) : 0;
+  const reviewHrs = (prMs && mergedMs) ? Math.max(0, (mergedMs - prMs) / 3_600_000) : 0;
 
-  // Marker line at the Todo → In Progress boundary
+  const todoColor = P.lavender;
+  const inProgColor = "#f59e0b";
+  const reviewColor = P.mintDeep;
+
   const markerPct = todoPct;
+  const showMid = inProgMs != null && todoPct > 2 && todoPct < 88;
+  const leftIsIp = inProgMs != null && todoPct <= 2;
+  const midAtEnd = showMid && todoPct >= 70;
+  const midLeftPct = showMid ? Math.max(todoPct, 28) : 0;
 
   return (
     <Stack gap={6}>
-      {/* Bar */}
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", overflow: "hidden" }}>
         <div style={{
           height: 10, borderRadius: 5, background: theme.fill.tertiary,
-          overflow: "visible", display: "flex",
+          overflow: "hidden", display: "flex",
         }}>
-          {/* Todo segment */}
-          <div title={`Todo: ${fmtHours(todoHrs)}`} style={{
-            width: `${todoPct}%`, background: todoColor,
-            borderRadius: inProgMs ? "5px 0 0 5px" : 5,
-            transition: "width 0.3s",
-          }} />
-          {/* In Progress segment */}
-          {inProgPct > 0 && (
-            <div title={`In Progress: ${fmtHours(inProgHrs)}`} style={{
-              width: `${inProgPct}%`, background: inProgColor,
-              borderRadius: reviewPct > 0 ? "0" : "0 5px 5px 0",
+          {todoPct > 0.5 && (
+            <div title={`Todo: ${fmtHours(todoHrs)}`} style={{
+              width: `${todoPct}%`, background: todoColor,
+              borderRadius: inProgMs ? "5px 0 0 5px" : 5,
+              transition: "width 0.3s",
             }} />
           )}
-          {/* Review segment */}
-          {reviewPct > 0 && (
+          {inProgPct > 0.5 && (
+            <div title={`In Progress: ${fmtHours(inProgHrs)}`} style={{
+              width: `${inProgPct}%`, background: inProgColor,
+              borderRadius: reviewPct > 0.5
+                ? (todoPct <= 0.5 ? "5px 0 0 5px" : "0")
+                : (todoPct <= 0.5 ? 5 : "0 5px 5px 0"),
+            }} />
+          )}
+          {reviewPct > 0.5 && (
             <div title={`Review: ${fmtHours(reviewHrs)}`} style={{
               width: `${reviewPct}%`, background: reviewColor,
               borderRadius: "0 5px 5px 0",
             }} />
           )}
-          {/* Trailing pulse if still open */}
           {!mergedMs && (
             <div style={{ width: 6, background: inProgMs ? inProgColor : todoColor, opacity: 0.4, borderRadius: "0 3px 3px 0" }} />
           )}
-          {/* Transition marker (vertical tick at Todo → In Progress) */}
-          {inProgMs && (
+          {inProgMs && todoPct > 0.5 && todoPct < 99.5 && (
             <div style={{
               position: "absolute", left: `${markerPct}%`,
               top: -3, bottom: -3, width: 2,
@@ -181,26 +190,37 @@ function TimelineBar({ issue }: { issue: Issue }) {
         </div>
       </div>
 
-      {/* Phase labels row */}
-      <div style={{ position: "relative", height: 32 }}>
-        {/* Todo label — anchored to left */}
+      <div style={{ position: "relative", height: 36, overflow: "hidden" }}>
         <span style={{
-          position: "absolute", left: 0,
+          position: "absolute", left: 0, maxWidth: "42%",
           fontSize: 9, color: theme.text.tertiary,
           display: "flex", flexDirection: "column", alignItems: "flex-start",
         }}>
-          <span style={{ fontWeight: 500, color: theme.text.secondary }}>Todo</span>
-          <span>{fmtDate(issue.todoAt)}</span>
-          <span style={{ color: theme.text.quaternary }}>{fmtHours(todoHrs)}</span>
+          {leftIsIp ? (
+            <>
+              <span style={{ fontWeight: 600, color: inProgColor }}>▶ In Progress</span>
+              <span>{fmtDate(issue.inProgressAt!)}</span>
+              <span style={{ color: theme.text.quaternary }}>{fmtHours(inProgHrs)}</span>
+            </>
+          ) : (
+            <>
+              <span style={{ fontWeight: 500, color: theme.text.secondary }}>Todo</span>
+              <span>{fmtDate(issue.todoAt)}</span>
+              <span style={{ color: theme.text.quaternary }}>{fmtHours(todoHrs)}</span>
+            </>
+          )}
         </span>
 
-        {/* In Progress label — anchored at the transition marker */}
-        {inProgMs && (
+        {showMid && (
           <span style={{
             position: "absolute",
-            left: `calc(${markerPct}% + 4px)`,
+            ...(midAtEnd
+              ? { right: 0, left: "auto", alignItems: "flex-end" as const }
+              : { left: `${midLeftPct}%` }),
+            maxWidth: "42%",
             fontSize: 9,
-            display: "flex", flexDirection: "column", alignItems: "flex-start",
+            display: "flex", flexDirection: "column",
+            alignItems: midAtEnd ? "flex-end" : "flex-start",
           }}>
             <span style={{ fontWeight: 600, color: inProgColor }}>▶ In Progress</span>
             <span style={{ color: theme.text.tertiary }}>{fmtDate(issue.inProgressAt!)}</span>
@@ -210,9 +230,8 @@ function TimelineBar({ issue }: { issue: Issue }) {
           </span>
         )}
 
-        {/* End label — anchored to right */}
         <span style={{
-          position: "absolute", right: 0,
+          position: "absolute", right: 0, maxWidth: "36%",
           fontSize: 9, color: theme.text.tertiary,
           display: "flex", flexDirection: "column", alignItems: "flex-end",
         }}>

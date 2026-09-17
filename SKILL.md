@@ -23,6 +23,7 @@ Personal GitHub Project cycle-time board. Identity comes from **`gh` auth or `GH
 | Fetch latest data | `python3 scripts/fetch.py` |
 | Regenerate HTML | `python3 scripts/generate_html.py` |
 | Regenerate Cursor canvas | `python3 scripts/generate_canvas.py` |
+| Open board in Chrome | `open -a "Google Chrome" http://127.0.0.1:8765/board` |
 
 ## Workflow
 
@@ -31,7 +32,9 @@ Progress:
 - [ ] 1. boards.json exists — else run configure.py
 - [ ] 2. Fetch data from GitHub
 - [ ] 3. Generate HTML board
-- [ ] 4. Open / serve the board
+- [ ] 4. Generate canvas
+- [ ] 5. Start configure.py if it is not already running
+- [ ] 6. Always open Google Chrome to http://127.0.0.1:8765/board
 ```
 
 ### 1. Configure (first time or switching projects)
@@ -51,30 +54,42 @@ The browser UI has a **Save and build board** button that runs fetch + generate 
 ```bash
 python3 scripts/fetch.py
 python3 scripts/generate_html.py
+python3 scripts/generate_canvas.py
 ```
 
 ### 3. Open the board
 
-**Preferred — via the configure server** (enables Sync and Auto-sync):
+**Always open Google Chrome.** Do not use generic `open` or `xdg-open` as the primary opener.
+
+Start the configure server if it is not already running (enables Sync and Auto-sync):
 
 ```bash
-# Start the server if not already running
 python3 scripts/configure.py &
 
 # Board is served at:
 # http://127.0.0.1:8765/board
 ```
 
-Open `http://127.0.0.1:8765/board` in the user's browser. On Linux use `xdg-open`, on macOS use `open`.
-
-**Alternative — static file** (no sync, but works offline):
+Then always open Chrome:
 
 ```bash
-# Linux
-xdg-open dist/index.html
-
 # macOS
-open dist/index.html
+open -a "Google Chrome" http://127.0.0.1:8765/board
+
+# Linux
+google-chrome http://127.0.0.1:8765/board
+```
+
+`python3 scripts/configure.py` auto-opens Chrome to the board when `dist/index.html` exists.
+
+**Offline fallback — static file** (no sync): still always Chrome.
+
+```bash
+# macOS
+open -a "Google Chrome" dist/index.html
+
+# Linux
+google-chrome dist/index.html
 ```
 
 ### 4. Optional: Cursor canvas
@@ -90,3 +105,4 @@ python3 scripts/generate_canvas.py
 - `boards.json` is gitignored — it contains the user's personal project selection.
 - The configure server binds to `127.0.0.1:8765` by default. Use `--port` to change.
 - Only issues **assigned to the authenticated user** appear on the board.
+- Always open the board in Google Chrome, never the system default browser.
