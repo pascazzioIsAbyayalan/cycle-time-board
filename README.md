@@ -49,17 +49,22 @@ Your choices are saved locally in `boards.json` (gitignored — not committed).
 
 ### Open the board
 
-While configure is still running:
+**Always open Google Chrome** (not the system default browser). While configure is still running:
 
 ```text
 http://127.0.0.1:8765/board
 ```
 
-Or open the static file anytime:
+```bash
+open -a "Google Chrome" http://127.0.0.1:8765/board   # macOS
+# google-chrome http://127.0.0.1:8765/board            # Linux
+```
+
+Or open the static file anytime (still Chrome):
 
 ```bash
-open dist/index.html        # macOS
-# xdg-open dist/index.html  # Linux
+open -a "Google Chrome" dist/index.html   # macOS
+# google-chrome dist/index.html           # Linux
 ```
 
 ### Keep it up to date
@@ -107,7 +112,7 @@ In Cursor chat:
 
 ## Recomendations
 
-- Prefer opening the board at **http://127.0.0.1:8765/board** so **Sync** and **Auto-sync** work.
+- Always open the board in **Google Chrome** at **http://127.0.0.1:8765/board** so **Sync** and **Auto-sync** work.
 - Only issues **assigned to you** show up — check assignees on GitHub if the board looks empty.
 - Pick the repos that actually hold your issues; more repos = slower first fetch.
 - For org Projects, authorize SSO on your token if GitHub asks.
@@ -118,7 +123,7 @@ In Cursor chat:
 
 | Problem | What to try |
 | ------- | ----------- |
-| Sync button disabled | Run `python3 scripts/configure.py` and open the board via http://127.0.0.1:8765/board |
+| Sync button disabled | Run `python3 scripts/configure.py` and open the board in Chrome at http://127.0.0.1:8765/board |
 | No Projects listed | Confirm you can open the Project in GitHub; token needs `read:project` (+ `read:org` / SSO) |
 | Empty board | Issues must be assigned to **your** login; check selected repos |
 | No PR Solution Summary | Fill in the PR description (`## Description`, `## Changes made`, etc.), then Sync again |

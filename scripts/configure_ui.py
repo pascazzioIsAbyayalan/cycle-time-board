@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -364,6 +365,9 @@ class ConfigureHandler(BaseHTTPRequestHandler):
         return link_host, port
 
     def _start_build(self, cfg: dict | None, *, refresh_only: bool) -> None:
+        link_host, port = self._link_host_port()
+        # Mark running BEFORE the thread starts / 202 returns so pollers never
+        # see a stale done=True from the previous sync and reload immediately.
         with _build_lock:
             if _build_state.get("running"):
                 self._json(
@@ -374,8 +378,23 @@ class ConfigureHandler(BaseHTTPRequestHandler):
                     },
                 )
                 return
+            _build_state.update(
+                {
+                    "running": True,
+                    "done": False,
+                    "stage": "save" if not refresh_only else "fetch",
+                    "message": "Writing boards.json…"
+                    if not refresh_only
+                    else "Syncing with GitHub…",
+                    "error": None,
+                    "boardUrl": None,
+                    "path": None,
+                    "startedAt": time.time(),
+                    "finishedAt": None,
+                }
+            )
+            snapshot = dict(_build_state)
 
-        link_host, port = self._link_host_port()
         thread = threading.Thread(
             target=_run_build,
             kwargs={"cfg": cfg, "host": link_host, "port": port, "refresh_only": refresh_only},
@@ -387,7 +406,7 @@ class ConfigureHandler(BaseHTTPRequestHandler):
             {
                 "started": True,
                 "message": "Sync started. Poll /api/build for progress.",
-                "build": _get_build(),
+                "build": snapshot,
             },
         )
 
@@ -413,6 +432,42 @@ class ConfigureHandler(BaseHTTPRequestHandler):
         self._start_build(None, refresh_only=True)
 
 
+def open_in_chrome(url: str) -> bool:
+    """Open a URL in Google Chrome (project default). Falls back to system browser."""
+    # macOS
+    if sys.platform == "darwin":
+        for app in ("Google Chrome", "Chrome"):
+            try:
+                subprocess.run(
+                    ["open", "-a", app, url],
+                    check=True,
+                    capture_output=True,
+                )
+                return True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                continue
+    # Linux
+    for bin_name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+        path = shutil.which(bin_name)
+        if path:
+            try:
+                subprocess.Popen(
+                    [path, url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return True
+            except OSError:
+                continue
+    # Windows / last resort
+    try:
+        browser = webbrowser.get("chrome")
+        return bool(browser.open(url))
+    except webbrowser.Error:
+        pass
+    return bool(webbrowser.open(url))
+
+
 def run_ui(
     *,
     host: str = DEFAULT_HOST,
@@ -431,11 +486,16 @@ def run_ui(
         return 1
 
     url = f"http://{host}:{port}/"
+    board_url = f"http://{host}:{port}/board"
     print(f"Configure UI: {url}", flush=True)
+    if BOARD_HTML.exists():
+        print(f"Board:         {board_url}", flush=True)
     print("Leave this terminal open. Press Ctrl+C to stop.\n", flush=True)
 
     if open_browser:
-        threading.Timer(0.4, lambda: webbrowser.open(url)).start()
+        # Prefer the board when it exists; otherwise open the configure UI.
+        target = board_url if BOARD_HTML.exists() else url
+        threading.Timer(0.4, lambda: open_in_chrome(target)).start()
 
     try:
         httpd.serve_forever()
